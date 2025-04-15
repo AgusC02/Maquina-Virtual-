@@ -1,4 +1,4 @@
-
+#include "MV.h"
 
 void inicializoTDS(TMV* MV,short int TamCS){
   MV->TDS[0]=TamCS; //En realidad es . pero como MV tiene puntero es *. entonces ->
@@ -7,9 +7,9 @@ void inicializoTDS(TMV* MV,short int TamCS){
 }
 
 void inicializoRegistros(TMV *MV){
-  MV->R[0]=0X00000000;   //Es con o sin flecha? //CS
-  MV->R[1]=0X00010000;  //DS
-  MV->R[5]=MV->R[0]; //IP
+  MV->R[CS]=0X00000000;   //Es con o sin flecha? //CS
+  MV->R[DS]=0X00010000;  //DS
+  MV->R[IP]=MV->R[0]; //IP
 }
 
 void inicializoErrores(TMV *MV){
@@ -113,7 +113,7 @@ void LeoHeader(FILE *arch,short int *TamCS){
   fread(&leo,sizeof(char),1,arch);
   *TamCS=leo<<8;
   fread(&leo,sizeof(char),1,arch);
-  *TamCS+=leo; //Tamaño del segmento del codigo.
+  *TamCS+=leo; //Tamaï¿½o del segmento del codigo.
 }
 
 void LeoCodigo(FILE *arch,TMV *MV, short int TamCS){ //Guardo el codigo a la ram y empiezo a leer la instruccion desde ahi
@@ -147,12 +147,12 @@ void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,Co
    // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
    }
    else
-       MV->Errores[0]=1; // código de operación de la instrucción a ejecutar no existe.
+       MV->Errores[0]=1; // cï¿½digo de operaciï¿½n de la instrucciï¿½n a ejecutar no existe.
 
    if ((MV->Errores[0] || MV->Errores[1] || MV->Errores[2])
       *Error=1;
 
-   // Avanzo a la proxima instrucción
+   // Avanzo a la proxima instrucciï¿½n
 
    MV->R[5]+=opA+opB+1;// TamA = opA ; TamB = opB
 }
