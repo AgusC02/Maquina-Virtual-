@@ -1,7 +1,9 @@
+
+
 void inicializoTDS(TMV* MV,short int TamCS){
-  MV->TDS[0]=tamanioCS; //En realidad es . pero como MV tiene puntero es *. entonces ->
-  MV->TDS[1]=tamanioCS << 16;
-  MV->TDS[1]+=(TMEM-tamanioCS);
+  MV->TDS[0]=TamCS; //En realidad es . pero como MV tiene puntero es *. entonces ->
+  MV->TDS[1]=TamCS << 16;
+  MV->TDS[1]+=(TMEM-TamCS);
 }
 
 void inicializoRegistros(TMV *MV){
@@ -109,13 +111,91 @@ void LeoHeader(FILE *arch,short int *TamCS){
   //DEBO PREPARAR ARCHIVO PARA LECTURA
   fseek(arch,6,SEEK_SET);
   fread(&leo,sizeof(char),1,arch);
-  *tamanioCS=leo<<8;
+  *TamCS=leo<<8;
   fread(&leo,sizeof(char),1,arch);
-  *tamanioCS+=leo; //Tamaño del segmento del codigo.
+  *TamCS+=leo; //Tamaño del segmento del codigo.
 }
 
 void LeoCodigo(FILE *arch,TMV *MV, short int TamCS){ //Guardo el codigo a la ram y empiezo a leer la instruccion desde ahi
+
+void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
+
+  unsigned char InstruccionActual; //La instruccion son 8 bits
+  int DFisicaInicial, OffsetActual, DirFisicaActual
+
+  DirFisicaInicial = ((MV->TDS[(MV->R[5] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
+  OffsetActual = ((MV->TDS[(MV->R[5] & 0XFFFF0000) >> 16] ) & 0XFFFF);
+  DirFisicaActual =  DirFisicaInicial + OffsetActual;
+  InstruccionActual = MV->M[DirFisicaActual];
+
+
+
+  int CantOp,opA,opB,CodOp;
+  int ValorA=0,ValorB=0;  //Pueden ser de 24,16 u 8 bits por eso es int;
+
+  ComponentesInstruccion(InstruccionActual,&opA,&opB,&CodOp,&CantOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
+
+  if ((CodOp >= 0) && ((CodOp <= 12) || ((CodOp<=26) && (CodOp>=16)) || (CodOp == 31))){
+
+    if (CantOp == 1) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
+       SeteoValorOp(MV,opA,&ValorA);
+    else
+       if (CantOp == 2){  //Si son dos operandos, primero se lee el operando B y luego el A.
+          SeteoValorOp(MV,opB,&ValorB);
+          SeteoValorOp(MV,opA,&ValorA);
+       }
+   // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
+   }
+   else
+       MV->Errores[0]=1; // código de operación de la instrucción a ejecutar no existe.
+
+   if ((MV->Errores[0] || MV->Errores[1] || MV->Errores[2])
+      *Error=1;
+
+   // Avanzo a la proxima instrucción
+
+   MV->R[5]+=opA+opB+1;// TamA = opA ; TamB = opB
+}
+
+void ComponentesInstruccion(int Instruccion,int *opA,int *opB,int *CodOp,int *CantOp){
+  //A priori no se cual es el opA y opB, suponemos que son 2 operandos, mas abajo, verifico.
+
+  *opB = (Instruccion & 0XFF000000) >> 6;
+  *opA = (Instruccion & 0X00FF0000) >> 4;
+  *CodOp = Instruccion & 0X1F;
+  *CantOp=2;
+
+  //Si no pasa por ningun if significa que tiene dos operandos.
+
+  if !(*opA & 0x01){ //No existe opA -> ???0
+      if (*opB == 0){ //No existe opB
+        *opA=0;
+        *opB=0;
+        *CantOp=0;
+      }
+      else{ //Existe solo un operando
+          *opA=*opB; //Cuando hay un solo operando se llama opA y es en la posicion que antes tenia opB
+          *opB=0;
+          *CantOp=1;
+      }
+  }
+
+}
+
+void SeteoValorOp(TMV* MV,int DirFisicaActual, int op,int *valorOp){
+
+    for (int i=0;i<op;i++){
+        *valorOp+=MV->M[++DirFisicaActual];
+        if ((op-i) > 1)
+            *valorOp = *valorOp << 8;
+    }
+    // == 0 nada
+    // == 1 registro 8 bits
+    // == 2 inmediato 16 bits
+    // == 3 memoria 24 bits
+
+}
     fseek(arch, 8, SEEK_SET);
-    for (int i=0; i < tamanioCS;i++)
+    for (int i=0; i < TamCS;i++)
         fread(&(MV->MEM[i]),1,1,arch);
 }
