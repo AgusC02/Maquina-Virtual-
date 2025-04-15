@@ -27,12 +27,12 @@ int main(int argc, char *argv[]){
 
 
 
-    int PosActual =  (( MV.TDS[(MV.R[5] & 0XFFFF0000) >> 16] ) & 0XFFFF) >> 16 ;       // Pos Inicial IP
-    int PosFinalCS = (( MV.TDS[(MV.R[0] & 0XFFFF0000) >> 16] >> 16) & 0XFFFF) + TamCS; // Pos Inicial CS + TamCS = Pos Final CS
+    int PosActual =  (( MV.TDS[(MV.R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF) >> 16 ;       // Pos Inicial IP
+    int PosFinalCS = (( MV.TDS[(MV.R[CS] & 0XFFFF0000) >> 16] >> 16) & 0XFFFF) + TamCS; // Pos Inicial CS + TamCS = Pos Final CS
 
     while ((PosActual < PosFinalCS ) && (!error)){
         // INSTRUCCIONES
-        PosActual = ( ( MV.TDS[(MV.R[5] & 0XFFFF0000) >> 16] ) >> 16 ) + (MV.R[5] & 0XFFFF); // Inicio de IP + offset nuevo IP = Nuevo Pos Actual IP
+        PosActual = ( ( MV.TDS[(MV.R[IP] & 0XFFFF0000) >> 16] ) >> 16 ) + (MV.R[IP] & 0XFFFF); // Inicio de IP + offset nuevo IP = Nuevo Pos Actual IP
     }
 
     if (MV.Errores[0] || MV.Errores[1] || MV.Errores[2])
