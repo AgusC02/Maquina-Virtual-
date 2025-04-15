@@ -53,22 +53,22 @@ void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
 }
 
 void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
-    strcpy(VecRegistros[0], "CS");
-    strcpy(VecRegistros[1], "DS");
+    strcpy(VecRegistros[CS], "CS");
+    strcpy(VecRegistros[DS], "DS");
     strcpy(VecRegistros[2], "");
     strcpy(VecRegistros[3], "");
     strcpy(VecRegistros[4], "");
-    strcpy(VecRegistros[5], "IP");
+    strcpy(VecRegistros[IP], "IP");
     strcpy(VecRegistros[6], "");
     strcpy(VecRegistros[7], "");
-    strcpy(VecRegistros[8], "CC");
-    strcpy(VecRegistros[9], "AC");
-    strcpy(VecRegistros[10], "A");
-    strcpy(VecRegistros[11], "B");
-    strcpy(VecRegistros[12], "C");
-    strcpy(VecRegistros[13], "D");
-    strcpy(VecRegistros[14], "E");
-    strcpy(VecRegistros[15], "F");
+    strcpy(VecRegistros[CC], "CC");
+    strcpy(VecRegistros[AC], "AC");
+    strcpy(VecRegistros[EAX], "A");
+    strcpy(VecRegistros[EBX], "B");
+    strcpy(VecRegistros[ECX], "C");
+    strcpy(VecRegistros[EDX], "D");
+    strcpy(VecRegistros[EEX], "E");
+    strcpy(VecRegistros[EFX], "F");
 
 }
 
@@ -123,8 +123,8 @@ void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,Co
   unsigned char InstruccionActual; //La instruccion son 8 bits
   int DFisicaInicial, OffsetActual, DirFisicaActual
 
-  DirFisicaInicial = ((MV->TDS[(MV->R[5] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
-  OffsetActual = ((MV->TDS[(MV->R[5] & 0XFFFF0000) >> 16] ) & 0XFFFF);
+  DirFisicaInicial = ((MV->TDS[(MV->R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
+  OffsetActual = ((MV->TDS[(MV->R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF);
   DirFisicaActual =  DirFisicaInicial + OffsetActual;
   InstruccionActual = MV->M[DirFisicaActual];
 
@@ -154,7 +154,7 @@ void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,Co
 
    // Avanzo a la proxima instrucci�n
 
-   MV->R[5]+=opA+opB+1;// TamA = opA ; TamB = opB
+   MV->R[IP]+=opA+opB+1;// TamA = opA ; TamB = opB
 }
 
 void ComponentesInstruccion(int Instruccion,int *opA,int *opB,int *CodOp,int *CantOp){
@@ -195,7 +195,4 @@ void SeteoValorOp(TMV* MV,int DirFisicaActual, int op,int *valorOp){
     // == 3 memoria 24 bits
 
 }
-    fseek(arch, 8, SEEK_SET);
-    for (int i=0; i < TamCS;i++)
-        fread(&(MV->MEM[i]),1,1,arch);
-}
+

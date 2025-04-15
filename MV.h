@@ -4,6 +4,7 @@
 #define CANTFUNC 30
 #define CANTREG 16
 #define CANTERRORES 3
+#define TDDSSIZE 8
 
 // Define de registros
 #define CS 0
@@ -23,11 +24,16 @@
 #define EFX 15
 
 //Estan todas las funciones que solicitaba el enunciado del TP de MV pero no llegu� a corregir los errores de compilacion, estar�n corregidos para la siguiente entrega de la parte 1
+typedef struct {
+    unsigned char c1,c2,c3,c4,c5;
+    char version;
+    unsigned short int tam;
+}theader;
 
 typedef struct TMV{
   unsigned char MEM[TMEM]; //Memoria, unsigned ya que la memoria no puede usar complemento a 2, nosotros tenemos que darle la interpretaci�n de si es negativo o positivo.
   int R[CANTREG]; //Registros
-  int TDS[8]; //Segmentos
+  int TDS[TDDSSIZE]; //Segmentos
   int Errores[CANTERRORES];
 }TMV;
 
