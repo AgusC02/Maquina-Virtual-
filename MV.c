@@ -8,7 +8,7 @@ void inicializoTDS(TMV* MV,short int TamCS){
 
 void inicializoRegistros(TMV *MV){
   MV->R[CS]=0X00000000;   //Es con o sin flecha? //CS
-  MV->R[DS]=0X00010000;  //DS
+  MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
   MV->R[IP]=MV->R[CS]; //IP
 }
 
@@ -16,6 +16,16 @@ void inicializoErrores(TMV *MV){
   MV->Errores[0]=0;
   MV->Errores[1]=0;
   MV->Errores[2]=0;
+}
+//IDEA: FUNCION QUE DEVUELVA UN INT CON LA DIRECCION FISICA A PARTIR DE UN UNSIGNED SHORTINT "SEGMENTO" + SHORTINT "OFFSET"
+int direccionamiento_logtofis(TMV *MV, unsigned short int segmento, short int offset){
+    int dirbase,off,result;
+
+    dirbase=MV->TDS[segmento]>>16;
+    off=offset;
+    result=dirbase+off;
+    //ACA HABRIA QUE CHECKEAR QUE EL ACCESO SE ENCUENTRE DENTRO DEL SEGMENTO ESPECIFICADO Y DECIDIR QUE HACER SI NO.
+    return result;
 }
 
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
