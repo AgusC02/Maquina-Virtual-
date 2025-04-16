@@ -106,17 +106,37 @@ void declaroFunciones(TFunc Funciones){
 
 }
 
-void LeoHeader(FILE *arch,short int *TamCS){
-  char leo;
+void LeoArch(char nomarch[],TMV *MV){
+  FILE *arch;
+  //char t_primer_byte,t_segundo_byte; POR SI NO LEE DE UNA EL SHORT INT.
+  theader header;
+  int i=0;
   //DEBO PREPARAR ARCHIVO PARA LECTURA
-  fseek(arch,6,SEEK_SET);
-  fread(&leo,sizeof(char),1,arch);
-  *TamCS=leo<<8;
-  fread(&leo,sizeof(char),1,arch);
-  *TamCS+=leo; //Tama�o del segmento del codigo.
-}
+  arch = fopen(nomarch,"rb");
+  fread(&header.c1,sizeof(char),1,arch);
+  fread(&header.c2,sizeof(char),1,arch);
+  fread(&header.c3,sizeof(char),1,arch);
+  fread(&header.c4,sizeof(char),1,arch);
+  fread(&header.c5,sizeof(char),1,arch);
+  fread(&header.version,sizeof(char),1,arch);
+  fread(&header.tam,sizeof(short int),1,arch);
 
-void LeoCodigo(FILE *arch,TMV *MV, short int TamCS){ //Guardo el codigo a la ram y empiezo a leer la instruccion desde ahi
+  if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
+    if (header.version ==1){
+        inicializoTDS(MV,header.tam);
+        inicializoRegistros(MV);
+        inicializoErrores(MV);
+        //CARGAR EL CODIGO EN LA MEMORIA DE LA MV
+        while(!feof(arch)){
+            fread(&(MV->MEM[i]),1,1,arch);
+            i++;
+        }
+    }
+    }
+   fclose(arch);
+  }
+
+
 
 void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
 
@@ -126,7 +146,7 @@ void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,Co
   DirFisicaInicial = ((MV->TDS[(MV->R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
   OffsetActual = ((MV->TDS[(MV->R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF);
   DirFisicaActual =  DirFisicaInicial + OffsetActual;
-  InstruccionActual = MV->M[DirFisicaActual];
+  InstruccionActual = MV->MEM[DirFisicaActual];
 
 
 
@@ -135,7 +155,7 @@ void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,Co
 
   ComponentesInstruccion(InstruccionActual,&opA,&opB,&CodOp,&CantOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
 
-  if ((CodOp >= 0) && ((CodOp <= 12) || ((CodOp<=26) && (CodOp>=16)) || (CodOp == 31))){
+  if ((CodOp >= 0) && ((CodOp <= 12) || ((CodOp<=26) && (CodOp>=16)) || (CodOp == 31))){ // Si el codigo de operacion es valido CAMBIAR
 
     if (CantOp == 1) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
        SeteoValorOp(MV,opA,&ValorA);
@@ -185,7 +205,7 @@ void ComponentesInstruccion(int Instruccion,int *opA,int *opB,int *CodOp,int *Ca
 void SeteoValorOp(TMV* MV,int DirFisicaActual, int op,int *valorOp){
 
     for (int i=0;i<op;i++){
-        *valorOp+=MV->M[++DirFisicaActual];
+        *valorOp+=MV->MEM[++DirFisicaActual];
         if ((op-i) > 1)
             *valorOp = *valorOp << 8;
     }

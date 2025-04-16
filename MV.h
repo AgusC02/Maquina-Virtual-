@@ -44,6 +44,6 @@ void inicializoErrores(TMV *MV);
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]); //PARA DISASSEMBLER
 void inicializoVecRegistros(char VecRegistros[CANTREG][4]);  //PARA DISASSEMBLER
 void declaroFunciones(TFunc Funciones);
-void LeoHeader(FILE *arch,short int *TamCS);
-void LeoCodigo(FILE *arch,TMV *MV, short int TamCS);
+void LeoArch(char nomarch[],TMV *MV);
+
 #endif // MV_H_INCLUDED
