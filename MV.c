@@ -9,7 +9,7 @@ void inicializoTDS(TMV* MV,short int TamCS){
 void inicializoRegistros(TMV *MV){
   MV->R[CS]=0X00000000;   //Es con o sin flecha? //CS
   MV->R[DS]=0X00010000;  //DS
-  MV->R[IP]=MV->R[0]; //IP
+  MV->R[IP]=MV->R[CS]; //IP
 }
 
 void inicializoErrores(TMV *MV){
