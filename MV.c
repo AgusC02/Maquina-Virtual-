@@ -185,22 +185,22 @@ void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,Co
 void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp){
   //A priori no se cual es el opA y opB, suponemos que son 2 operandos, mas abajo, verifico.
 
-  TInstruc->TamB = (Instruccion & 0XFF000000) >> 6;
-  TInstruc->TamA = (Instruccion & 0X00FF0000) >> 4;
+  instruc->TamB = (Instruccion & 0XFF000000) >> 6;
+  instruc->TamA = (Instruccion & 0X00FF0000) >> 4;
   *CodOp = Instruccion & 0X1F;
   *CantOp=2;
 
   //Si no pasa por ningun if significa que tiene dos operandos.
 
-  if !(TInstruc->TamA & 0x01){ //No existe opA -> ???0
-      if (TInstruc->TamB == 0){ //No existe opB
-        TInstruc->TamA=0;
-        TInstruc->TamB=0;
+  if (!(instruc->TamA & 0x01)){ //No existe opA -> ???0
+      if (instruc->TamB == 0){ //No existe opB
+        instruc->TamA=0;
+        instruc->TamB=0;
         *CantOp=0;
       }
       else{ //Existe solo un operando
-          TInstruc->TamA=TInstruc->TamB; //Cuando hay un solo operando se llama opA y es en la posicion que antes tenia opB
-          TInstruc->TamB=0;
+          instruc->TamA=instruc->TamB; //Cuando hay un solo operando se llama opA y es en la posicion que antes tenia opB
+          instruc->TamB=0;
           *CantOp=1;
       }
   }
@@ -319,7 +319,45 @@ void MOV(TMV * MV,TInstruc instruc){
 
 }
 
+void muestramemoria(unsigned char memoria[]){
+    int pos_i,pos_f;
+    printf("Ingresar de que posicion a que posicion mostrar\n Pos_inicial: ");
+    scanf("%d",pos_i);
+    printf("\nPos_final: ");
+    scanf("%d",pos_f);
 
+    printf("\n------- MEMORIA -------\n");
+    while(pos_i<=pos_f){
+        printf("[%08X] = %02X \n",pos_i,memoria[pos_i]);
+        pos_i++;
+    }
+}
+
+void muestraregistros(int reg[]){
+    int i;
+    char VecRegistros[CANTREG][4];
+
+    inicializoVecRegistros(VecRegistros);
+    printf("\n------- REGISTROS -------\n");
+    for(i=0;i<CANTREG;i++){
+        printf("%S : %04X \n",VecRegistros[i],reg[i]);
+    }
+}
+
+void muestratds(unsigned int tds[]){
+    int i;
+    printf("\n------- TDS -------\n");
+
+    for(i=0;i<TDDSSIZE;i++){
+        printf("pos:%d = %08X \n",i,tds[i]);
+    }
+}
+
+void muestravaloresmv(TMV mv){
+    muestratds(mv.TDS);
+    muestraregistros(mv.R);
+    muestramemoria(mv.MEM);
+}
 
 
 
