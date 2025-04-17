@@ -18,14 +18,14 @@ void inicializoErrores(TMV *MV){
   MV->Errores[2]=0;
 }
 //IDEA: FUNCION QUE DEVUELVA UN INT CON LA DIRECCION FISICA A PARTIR DE UN UNSIGNED SHORTINT "SEGMENTO" + SHORTINT "OFFSET"
-int direccionamiento_logtofis(TMV *MV, unsigned short int segmento, short int offset){
-    int dirbase,off,result;
+void direccionamiento_logtofis(TMV *MV, unsigned short int segmento, short int offset,unsigned int *direccionfisica, int *fallosegmento){
+    int dirbase,off;
 
     dirbase=MV->TDS[segmento]>>16;
     off=offset;
-    result=dirbase+off;
+    *direccionfisica=dirbase+off;
     //ACA HABRIA QUE CHECKEAR QUE EL ACCESO SE ENCUENTRE DENTRO DEL SEGMENTO ESPECIFICADO Y DECIDIR QUE HACER SI NO.
-    return result;
+    *fallosegmento=checkfallosegmento(MV,direccionfisica);
 }
 
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
@@ -226,3 +226,12 @@ void SeteoValorOp(TMV* MV,int DirFisicaActual, int op,int *valorOp){
 
 }
 
+void disassembler(TMV *MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]){
+    int primerinst,ultinst,i=0;
+
+    primerinst=(MV->TDS[MV->R[CS]>>16])>>16;
+    ultinst=(MV->TDS[MV->R[CS]>>16]&0x0000FFFF);
+    while(i<max){
+        //LEER TODAS LAS INSTRUCCIONES : HACER FUNCIONES QUE SAQUEN EL CODIGO DE OPERANDO, TIPOS DE OPERANDO Y ETC.
+    }
+}
