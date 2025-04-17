@@ -185,8 +185,8 @@ void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,Co
 void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp){
   //A priori no se cual es el opA y opB, suponemos que son 2 operandos, mas abajo, verifico.
 
-  TInstruc->TamB = (Instruccion & 0XFF000000) >> 6;
-  TInstruc->TamA = (Instruccion & 0X00FF0000) >> 4;
+  instruc->TamB = (Instruccion & 0XFF000000) >> 24;
+  instruc->TamA = (Instruccion & 0X00FF0000) >> 16;
   *CodOp = Instruccion & 0X1F;
   *CantOp=2;
 
