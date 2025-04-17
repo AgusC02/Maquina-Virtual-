@@ -359,7 +359,7 @@ void muestravaloresmv(TMV mv){
     muestramemoria(mv.MEM);
 }
 
-char obtienetipooperacion(char operacion){
+char obtienetipooperacion(unsigned char operacion){
   if (operacion&0x10==0x10)
     return 2; //2 operandos    
   else if (operacion&0xF0==0)
