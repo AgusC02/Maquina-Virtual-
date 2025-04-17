@@ -39,6 +39,8 @@ typedef struct TMV{
 
 typedef struct TInstruc{
   int OpA,OpB,TamA,TamB; // OpA = Valor A
+  unsigned char inst;
+  char tipoinstruccion; //Instruccion
 }TInstruc;
 
 
