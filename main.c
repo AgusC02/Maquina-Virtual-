@@ -18,9 +18,10 @@ int main(int argc, char *argv[]){
     strcpy(nomarch,argv[1]);
     LeoArch(nomarch,&MV);
 
-
-
-
+    //PARA DEBUGEAR
+    muestravaloresmv(MV);
+    //
+    abort();
     declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones); //No lleva & por que es un vector
     inicializoVecRegistros(VecRegistros);
@@ -30,7 +31,7 @@ int main(int argc, char *argv[]){
     int PosActual =  (( MV.TDS[(MV.R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF) >> 16 ;       // Pos Inicial IP
     int PosFinalCS = (( MV.TDS[(MV.R[CS] & 0XFFFF0000) >> 16] >> 16) & 0XFFFF) + TamCS; // Pos Inicial CS + TamCS = Pos Final CS
 
-    while ((PosActual < PosFinalCS ) && (!error)){
+    while ((PosActual < PosFinalCS ) && (!error)){ //No deberia ser posActual<=posFinal?
         // INSTRUCCIONES
         PosActual = ( ( MV.TDS[(MV.R[IP] & 0XFFFF0000) >> 16] ) >> 16 ) + (MV.R[IP] & 0XFFFF); // Inicio de IP + offset nuevo IP = Nuevo Pos Actual IP
     }
