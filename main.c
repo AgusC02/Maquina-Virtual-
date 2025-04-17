@@ -7,20 +7,20 @@ int main(int argc, char *argv[]){
     // VARIABLES
 
     TMV MV;
-    FILE *arch;
     short int TamCS = 0;
     TFunc Funciones;
     char VecFunciones[CANTFUNC][5]; //5 Es la cantidad de caracteres que tiene como maximo el nombre de la funcion.
     char VecRegistros[CANTREG][4];
+    char nomarch[50];
     int error=0;
 
     // INICIO
-    arch = fopen((argv[1]),"rb");
-    LeoHeader(arch,&TamCS);
-    LeoCodigo(arch,&MV,TamCS);
-    inicializoTDS(&MV,TamCS);
-    inicializoRegistros(&MV);
-    inicializoErrores(&MV);
+    strcpy(nomarch,argv[1]);
+    LeoArch(nomarch,&MV);
+
+
+
+
     declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones); //No lleva & por que es un vector
     inicializoVecRegistros(VecRegistros);
