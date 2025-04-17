@@ -1,13 +1,16 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "MV.h"
 
 void inicializoTDS(TMV* MV,short int TamCS){
-  MV->TDS[0]=TamCS; //En realidad es . pero como MV tiene puntero es *. entonces ->
+  MV->TDS[0]=TamCS;
   MV->TDS[1]=TamCS << 16;
   MV->TDS[1]+=(TMEM-TamCS);
 }
 
 void inicializoRegistros(TMV *MV){
-  MV->R[CS]=0X00000000;   //Es con o sin flecha? //CS
+  MV->R[CS]=0X00000000;
   MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
   MV->R[IP]=MV->R[CS]; //IP
 }
@@ -16,16 +19,6 @@ void inicializoErrores(TMV *MV){
   MV->Errores[0]=0;
   MV->Errores[1]=0;
   MV->Errores[2]=0;
-}
-//IDEA: FUNCION QUE DEVUELVA UN INT CON LA DIRECCION FISICA A PARTIR DE UN UNSIGNED SHORTINT "SEGMENTO" + SHORTINT "OFFSET"
-void direccionamiento_logtofis(TMV *MV, unsigned short int segmento, short int offset,unsigned int *direccionfisica, int *fallosegmento){
-    int dirbase,off;
-
-    dirbase=MV->TDS[segmento]>>16;
-    off=offset;
-    *direccionfisica=dirbase+off;
-    //ACA HABRIA QUE CHECKEAR QUE EL ACCESO SE ENCUENTRE DENTRO DEL SEGMENTO ESPECIFICADO Y DECIDIR QUE HACER SI NO.
-    *fallosegmento=checkfallosegmento(MV,direccionfisica);
 }
 
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
@@ -132,7 +125,7 @@ void LeoArch(char nomarch[],TMV *MV){
   fread(&header.tam,sizeof(short int),1,arch);
 
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
-    if (header.version ==1){
+    if (header.version == 1){
         inicializoTDS(MV,header.tam);
         inicializoRegistros(MV);
         inicializoErrores(MV);
@@ -146,78 +139,86 @@ void LeoArch(char nomarch[],TMV *MV){
    fclose(arch);
   }
 
+  //IDEA: FUNCION QUE DEVUELVA UN INT CON LA DIRECCION FISICA A PARTIR DE UN REGISTRO
+int direccionamiento_logtofis(TMV *MV, int reg){
+    int Dirbase,offset;
 
+    Dirbase = ((MV->TDS[(MV->R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
+    offset = ((MV->TDS[(MV->R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF);
+    //ACA HABRIA QUE CHECKEAR QUE EL ACCESO SE ENCUENTRE DENTRO DEL SEGMENTO ESPECIFICADO Y DECIDIR QUE HACER SI NO.
+    return Dirbase+offset;
+}
 
 void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
 
   unsigned char InstruccionActual; //La instruccion son 8 bits
-  int DFisicaInicial, OffsetActual, DirFisicaActual
+  int DirFisicaActual = direccionamiento_logtofis(MV,IP);
 
-  DirFisicaInicial = ((MV->TDS[(MV->R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
-  OffsetActual = ((MV->TDS[(MV->R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF);
-  DirFisicaActual =  DirFisicaInicial + OffsetActual;
   InstruccionActual = MV->MEM[DirFisicaActual];
 
-
-
-  int CantOp,opA,opB,CodOp;
+  int CantOp,opA,CodOp;
   int ValorA=0,ValorB=0;  //Pueden ser de 24,16 u 8 bits por eso es int;
+  TInstruc instruc;
 
-  ComponentesInstruccion(InstruccionActual,&opA,&opB,&CodOp,&CantOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
+  ComponentesInstruccion(InstruccionActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
 
-  if ((CodOp >= 0) && ((CodOp <= 12) || ((CodOp<=26) && (CodOp>=16)) || (CodOp == 31))){ // Si el codigo de operacion es valido CAMBIAR
+  if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
 
-    if (CantOp == 1) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
-       SeteoValorOp(MV,opA,&ValorA);
-    else
-       if (CantOp == 2){  //Si son dos operandos, primero se lee el operando B y luego el A.
-          SeteoValorOp(MV,opB,&ValorB);
-          SeteoValorOp(MV,opA,&ValorA);
-       }
+    if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
+       SeteoValorOp(MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
    // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
-   }
-   else
+
+    Funciones[CodOp](MV,instruc);
+
+    }
+    else
        MV->Errores[0]=1; // c�digo de operaci�n de la instrucci�n a ejecutar no existe.
 
-   if ((MV->Errores[0] || MV->Errores[1] || MV->Errores[2])
-      *Error=1;
+    if ((MV->Errores[0] || MV->Errores[1] || MV->Errores[2]))
+       *Error=1;
 
    // Avanzo a la proxima instrucci�n
 
-   MV->R[IP]+=opA+opB+1;// TamA = opA ; TamB = opB
+   MV->R[IP]+=instruc.TamA+instruc.TamB+1;// TamA = opA ; TamB = opB
 }
 
-void ComponentesInstruccion(int Instruccion,int *opA,int *opB,int *CodOp,int *CantOp){
+void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp){
   //A priori no se cual es el opA y opB, suponemos que son 2 operandos, mas abajo, verifico.
 
-  *opB = (Instruccion & 0XFF000000) >> 6;
-  *opA = (Instruccion & 0X00FF0000) >> 4;
+  TInstruc->TamB = (Instruccion & 0XFF000000) >> 6;
+  TInstruc->TamA = (Instruccion & 0X00FF0000) >> 4;
   *CodOp = Instruccion & 0X1F;
   *CantOp=2;
 
   //Si no pasa por ningun if significa que tiene dos operandos.
 
-  if !(*opA & 0x01){ //No existe opA -> ???0
-      if (*opB == 0){ //No existe opB
-        *opA=0;
-        *opB=0;
+  if !(TInstruc->TamA & 0x01){ //No existe opA -> ???0
+      if (TInstruc->TamB == 0){ //No existe opB
+        TInstruc->TamA=0;
+        TInstruc->TamB=0;
         *CantOp=0;
       }
       else{ //Existe solo un operando
-          *opA=*opB; //Cuando hay un solo operando se llama opA y es en la posicion que antes tenia opB
-          *opB=0;
+          TInstruc->TamA=TInstruc->TamB; //Cuando hay un solo operando se llama opA y es en la posicion que antes tenia opB
+          TInstruc->TamB=0;
           *CantOp=1;
       }
   }
 
 }
 
-void SeteoValorOp(TMV* MV,int DirFisicaActual, int op,int *valorOp){
+void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc){
 
-    for (int i=0;i<op;i++){
-        *valorOp+=MV->MEM[++DirFisicaActual];
-        if ((op-i) > 1)
-            *valorOp = *valorOp << 8;
+    for (int i=0;i<instruc->TamB;i++){
+        instruc->OpB+=MV->MEM[++DirFisicaActual];
+        if ((instruc->TamB-i) > 1)
+            instruc->OpB = instruc->OpB << 8;
+    }
+
+    for (int i=0;i<instruc->TamA;i++){
+        instruc->OpA+=MV->MEM[++DirFisicaActual];
+        if ((instruc->TamA-i) > 1)
+            instruc->OpA = instruc->OpA << 8;
     }
     // == 0 nada
     // == 1 registro 8 bits
@@ -226,12 +227,102 @@ void SeteoValorOp(TMV* MV,int DirFisicaActual, int op,int *valorOp){
 
 }
 
-void disassembler(TMV *MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]){
-    int primerinst,ultinst,i=0;
 
-    primerinst=(MV->TDS[MV->R[CS]>>16])>>16;
-    ultinst=(MV->TDS[MV->R[CS]>>16]&0x0000FFFF);
-    while(i<max){
-        //LEER TODAS LAS INSTRUCCIONES : HACER FUNCIONES QUE SAQUEN EL CODIGO DE OPERANDO, TIPOS DE OPERANDO Y ETC.
-    }
+void DefinoRegistro(unsigned char *Sec , int *CodOp, int Op){  //Defino el sector del registro en el que operare y el tipo de registro
+  *Sec = (Op >> 2) & 0x03;
+  *CodOp = (Op >> 4) & 0xF;
 }
+
+void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago las posiciones del registro de 32 bytes en el que asignare a otro registro/memoria
+  if (Sec == 1)
+        *AuxR = MV.R[CodReg] & 0XFF;
+      else
+        if (Sec == 2)
+          *AuxR = (MV.R[CodReg] & 0XFF00) >> 8;
+          else
+            if (Sec == 3)
+              *AuxR = MV.R[CodReg] & 0XFFFF;
+            else
+                *AuxR = MV.R[CodReg];
+}
+
+int LeoEnMemoria(TMV *MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
+    int aux=0,PosReg;
+
+    PosReg = direccionamiento_logtofis(MV,Op);
+
+    if ( ( PosReg >= (MV->TDS[0] & 0X0000FFFF) ) && (PosReg+3 <= TMEM)){ // si la posicion no es mas chica que la posicion inicial del registro en la memoria (ocurre si el offset se resta) y si la posicion es mas grande que el tamanio de la memoria
+      for (int i=0;i<4;i++){
+        aux+=MV->MEM[PosReg];
+        PosReg++;
+        if (4-i > 1)
+            aux=aux << 8;
+      }
+    }
+    else
+        MV->Errores[2]=1; //Fallo de segmento
+    return aux;
+}
+
+void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes de la memoria, se usa solo para el MOV
+    int PosReg;
+
+    PosReg = direccionamiento_logtofis(MV,Op);
+
+    if ( ( PosReg >= (MV->TDS[0] & 0X0000FFFF) ) && (PosReg+3 <= TMEM)){
+          for (int i=0;i<4;i++){
+              MV->MEM[PosReg] = (Valor & 0XFF000000) >> 24;
+              PosReg++;
+              if (4-i > 1)
+                Valor=Valor << 8;
+          }
+        }
+    else
+        MV->Errores[2]=1; //Fallo de segmento
+}
+
+void MOV(TMV * MV,TInstruc instruc){
+    int mover=0,PosReg,PosRegB,CodOpB;
+    unsigned char SecA,SecB;
+
+    //OPB
+    if (instruc.TamB == 1){ //Si Op2 es de registro, muevo el valor del puntero a memoria, por ejemplo 00 00 00 08
+        DefinoRegistro(&SecB,&CodOpB,instruc.OpB);
+        DefinoAuxRegistro(&mover,*MV,SecB,CodOpB);  //En mover (auxregistro) guardo el puntero a memoria que debo guardar, ya sea, el 3,4,34,o 1234 bytes.
+    }
+    else
+      if (instruc.TamB == 2)  //Inmediato
+         mover=instruc.OpB;
+      else
+        if (instruc.TamB == 3) //Memoria, debo sumar todos los valores dentro de la memoria y guardarlo en mover.
+            mover = LeoEnMemoria(MV,instruc.OpB);
+
+    //OPA
+    if (instruc.TamA == 1){ //Si Op1 es de registro, debo cambiar la posicion de memoria del registro por la que me diga el Op1
+        DefinoRegistro(&SecA,&CodOpB,instruc.OpA);
+        if (SecA == 1) //4 byte
+            MV->R[instruc.OpA] = (MV->R[instruc.OpA] & 0XFFFFFF00) + (mover & 0XFF);
+        else
+            if (SecA == 2){ //3 byte
+                MV->R[instruc.OpA] = (MV->R[instruc.OpA] & 0XFFFF00FF) + ( (mover & 0XFF) << 8);
+            }
+            else
+                if (SecA == 3) //3 y 4 byte
+                    MV->R[instruc.OpA] = (MV->R[instruc.OpA] & 0XFFFF0000) + (mover & 0XFFFF);
+                else //Los 4 bytes
+                    MV->R[instruc.OpA] = (MV->R[instruc.OpA] & 0X0000000000000000) + mover;
+
+    }
+     else{ //Es memoria ya que no se puede guardar nada en un inmediato
+        EscriboEnMemoria(MV,instruc.OpA,mover);
+    }
+
+}
+
+
+
+
+
+
+
+
