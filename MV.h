@@ -60,6 +60,10 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int Op);
 int LeoEnMemoria(TMV *MV,int Op);
 int GuardoValorMemoria(TMV *MV,int Op);
 void EscriboEnMemoria(TMV *MV,int Op, int Valor);
+void muestramemoria(unsigned char memoria[]);
+void muestraregistros(int reg[]);
+void muestratds(unsigned int tds[]);
+void muestravaloresmv(TMV mv);
 
 //FUNCIONES
 
