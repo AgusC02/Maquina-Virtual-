@@ -176,61 +176,53 @@ int direccionamiento_logtofis(TMV *MV, int reg){
 int posmaxCODESEGMENT(TMV *MV){
     int finCS;
 
-    finCS=(MV->TDS[MV->R[CS]]>>16)+MV->TDS[MV->R[CS]&0X0000FFFF
+    finCS=(MV->TDS[MV->R[CS]]>>16)+MV->TDS[MV->R[CS]]&0x0000FFFF;
     return finCS;
 }
 
 
-void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
+void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
  // Leo instruccion recibe la mv seteada y se encarga de leer y depurar todas las instrucciones - pasar del main al leo instrucción
     unsigned char InstruccionActual; //La instruccion son 8 bits
   //Vector de funciones como variable local.
     int finCS;
+    int CantOp,CodOp;
+    TInstruc instruc;
+    TFunc Funciones;
+
+    declaroFunciones(Funciones);
 
     int DirFisicaActual = direccionamiento_logtofis(MV,MV->R[IP]);
     finCS=posmaxCODESEGMENT(MV);
 
     while(direccionamiento_logtofis(MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
+        ComponentesInstruccion(direccionamiento_logtofis(MV,MV->R[IP]),&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
+        if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
 
+            if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
+               SeteoValorOp(MV, direccionamiento_logtofis(MV,MV->R[IP]), &instruc); // Distingue entre uno o dos operandos a setear
+           // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
+        
+            Funciones[CodOp](MV,instruc);
+        
+        }else
+            generaerror(1);
+        //Avanzo a la proxima instruccion.
+        MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
     }
-  InstruccionActual = MV->MEM[DirFisicaActual];
-
-  int CantOp,CodOp;
-  TInstruc instruc;
-
-  ComponentesInstruccion(InstruccionActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
-
-  if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
-
-    if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
-       SeteoValorOp(MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
-   // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
-
-    Funciones[CodOp](MV,instruc);
-
-    }
-    else
-       MV->Errores[0]=1; // c�digo de operaci�n de la instrucci�n a ejecutar no existe.
-
-    if ((MV->Errores[0] || MV->Errores[1] || MV->Errores[2]))
-       *Error=1;
-
-   // Avanzo a la proxima instrucci�n
-
-   MV->R[IP]+=instruc.TamA+instruc.TamB+1;// TamA = opA ; TamB = opB
 }
 
 void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp){
   //A priori no se cual es el opA y opB, suponemos que son 2 operandos, mas abajo, verifico.
 
-  instruc->TamB = (Instruccion & 0xFF000000) >> 24;
-  instruc->TamA = (Instruccion & 0x00FF0000) >> 16;
+  instruc->TamB = (Instruccion & 0x000000C0) >> 6;
+  instruc->TamA = (Instruccion & 0x00000030) >> 4;
   *CodOp = Instruccion & 0x1F;
   *CantOp=2;
 
   //Si no pasa por ningun if significa que tiene dos operandos.
 
-  if (!(instruc->TamA & 0x01)){ //No existe opA -> ???0
+  if (instruc->TamA == 0){ //No existe opA -> ???0
       if (instruc->TamB == 0){ //No existe opB
         instruc->TamA=0;
         instruc->TamB=0;

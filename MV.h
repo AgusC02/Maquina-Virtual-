@@ -40,7 +40,6 @@ typedef struct TMV{
 typedef struct TInstruc{
   int OpA,OpB,TamA,TamB; // OpA = Valor A
   unsigned char inst;
-  char tipoinstruccion; //Instruccion
 }TInstruc;
 
 
@@ -54,7 +53,7 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]);  //PARA DISASSEMBLER
 void declaroFunciones(TFunc Funciones);
 void LeoArch(char nomarch[],TMV *MV);
 int direccionamiento_logtofis(TMV *MV, int reg);
-void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error);
+void LeoInstruccion(TMV* MV);
 void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp);
 void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc);
 void DefinoRegistro(unsigned char *Sec , int *CodOp, int Op);
