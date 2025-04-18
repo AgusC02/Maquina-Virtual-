@@ -21,6 +21,22 @@ void inicializoErrores(TMV *MV){
   MV->Errores[2]=0;
 }
 
+void generaerror(int tipo){
+    if(tipo==0)
+        printf("ERROR DIVISION POR 0");
+    if(tipo==1)
+        printf("ERROR INSTRUCCION INVALIDA");
+    if(tipo==2)
+        printf("ERROR FALLO DE SEGMENTO");
+    if(tipo==3)
+        printf("MEMORIA INSUFICIENTE");
+    if(tipo==4)
+        printf("STACK OVERFLOW");
+    if(tipo==5)
+        printf("STACK UNDERFLOW");
+    abort();
+}
+
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
     //2 Operandos
     strcpy(VecFunciones[16], "MOV");
@@ -157,12 +173,26 @@ int direccionamiento_logtofis(TMV *MV, int reg){
         return DirBase+Offset;
 }
 
+int posmaxCODESEGMENT(TMV *MV){
+    int finCS;
+
+    finCS=(MV->TDS[MV->R[CS]]>>16)+MV->TDS[MV->R[CS]&0X0000FFFF
+    return finCS;
+}
+
+
 void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
  // Leo instruccion recibe la mv seteada y se encarga de leer y depurar todas las instrucciones - pasar del main al leo instrucción
-  unsigned char InstruccionActual; //La instruccion son 8 bits
-  int DirFisicaActual = direccionamiento_logtofis(MV,IP);
+    unsigned char InstruccionActual; //La instruccion son 8 bits
+  //Vector de funciones como variable local.
+    int finCS;
 
+    int DirFisicaActual = direccionamiento_logtofis(MV,MV->R[IP]);
+    finCS=posmaxCODESEGMENT(MV);
 
+    while(direccionamiento_logtofis(MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
+
+    }
   InstruccionActual = MV->MEM[DirFisicaActual];
 
   int CantOp,CodOp;
