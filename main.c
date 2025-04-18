@@ -7,7 +7,6 @@ int main(int argc, char *argv[]){
     // VARIABLES
 
     TMV MV;
-    short int TamCS = 0;
     TFunc Funciones;
     char VecFunciones[CANTFUNC][5]; //5 Es la cantidad de caracteres que tiene como maximo el nombre de la funcion.
     char VecRegistros[CANTREG][4];
@@ -18,14 +17,13 @@ int main(int argc, char *argv[]){
     strcpy(nomarch,argv[1]);
     LeoArch(nomarch,&MV);
 
-    //PARA DEBUGEAR
-    muestravaloresmv(MV);
-    //
-
     // abort();
     declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
+
+    //PARA DEBUGEAR
+    muestravaloresmv(MV);
 
     //if ((argv[2] !=0) && (strcmp(argv[2],"-d") == 0))
         // DISASSEMBLER
@@ -43,7 +41,7 @@ int main(int argc, char *argv[]){
 
 
     */ //--------------PASAR A LEO INSTRUCCION--------------------//
-    if (MV.Errores[0] || MV.Errores[1] || MV.Errores[2])
+    //if (MV.Errores[0] || MV.Errores[1] || MV.Errores[2])
         // ERRORES
 
     return 0;

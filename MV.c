@@ -4,9 +4,9 @@
 #include "MV.h"
 
 void inicializoTDS(TMV* MV,short int TamCS){
-  MV->TDS[0]=TamCS;
-  MV->TDS[1]=TamCS << 16;
-  MV->TDS[1]+=(TMEM-TamCS);
+  MV->TDS[CS]=TamCS;
+  MV->TDS[DS]=TamCS << 16;
+  MV->TDS[DS]+=(TMEM-TamCS);
 }
 
 void inicializoRegistros(TMV *MV){
@@ -19,6 +19,22 @@ void inicializoErrores(TMV *MV){
   MV->Errores[0]=0;
   MV->Errores[1]=0;
   MV->Errores[2]=0;
+}
+
+void generaerror(int tipo){
+    if(tipo==0)
+        printf("ERROR DIVISION POR 0");
+    if(tipo==1)
+        printf("ERROR INSTRUCCION INVALIDA");
+    if(tipo==2)
+        printf("ERROR FALLO DE SEGMENTO");
+    if(tipo==3)
+        printf("MEMORIA INSUFICIENTE");
+    if(tipo==4)
+        printf("STACK OVERFLOW");
+    if(tipo==5)
+        printf("STACK UNDERFLOW");
+    abort();
 }
 
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
@@ -78,7 +94,7 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
 void declaroFunciones(TFunc Funciones){
 //2 OPERANDOS
   Funciones[16]=MOV;
-  Funciones[17]=ADD;
+  /*Funciones[17]=ADD;
   Funciones[18]=SUB;
   Funciones[19]=SWAP;
   Funciones[20]=MUL;
@@ -106,7 +122,7 @@ void declaroFunciones(TFunc Funciones){
 
 //0 OPERANDOS
   Funciones[15]=STOP;
-
+*/
 }
 
 void LeoArch(char nomarch[],TMV *MV){
@@ -139,26 +155,47 @@ void LeoArch(char nomarch[],TMV *MV){
    fclose(arch);
   }
 
-  //IDEA: FUNCION QUE DEVUELVA UN INT CON LA DIRECCION FISICA A PARTIR DE UN REGISTRO
+  //MODIFICADO
 int direccionamiento_logtofis(TMV *MV, int reg){
-    int Dirbase,offset;
+    int DirBase,Offset,DirFisica,TamSeg,LimiteSup;
 
-    Dirbase = ((MV->TDS[(MV->R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
-    offset = ((MV->TDS[(MV->R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF);
-    //ACA HABRIA QUE CHECKEAR QUE EL ACCESO SE ENCUENTRE DENTRO DEL SEGMENTO ESPECIFICADO Y DECIDIR QUE HACER SI NO.
-    return Dirbase+offset;
+    DirBase = ((MV->TDS[(MV->R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
+    Offset = MV->R[reg] & 0X0000FFFF;
+    DirFisica = DirBase + Offset;
+    TamSeg = ((MV->TDS[(MV->R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF);
+    LimiteSup = DirBase + TamSeg;
+
+    if (!( (DirBase >= DirFisica ) && (DirFisica + 4 <= LimiteSup  ) )){
+        generaerror(2);
+        return -1;        // Aca nunca va a llegar si llama a generaerror, porque la ultima instruccion de la funcion es abort().
+    }
+    else
+        return DirBase+Offset;
 }
+
+int posmaxCODESEGMENT(TMV *MV){
+    int finCS;
+
+    finCS=(MV->TDS[MV->R[CS]]>>16)+MV->TDS[MV->R[CS]&0X0000FFFF
+    return finCS;
+}
+
 
 void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
  // Leo instruccion recibe la mv seteada y se encarga de leer y depurar todas las instrucciones - pasar del main al leo instrucción
-  unsigned char InstruccionActual; //La instruccion son 8 bits
-  int DirFisicaActual = direccionamiento_logtofis(MV,IP);
+    unsigned char InstruccionActual; //La instruccion son 8 bits
+  //Vector de funciones como variable local.
+    int finCS;
 
+    int DirFisicaActual = direccionamiento_logtofis(MV,MV->R[IP]);
+    finCS=posmaxCODESEGMENT(MV);
 
+    while(direccionamiento_logtofis(MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
+
+    }
   InstruccionActual = MV->MEM[DirFisicaActual];
 
-  int CantOp,opA,CodOp;
-  int ValorA=0,ValorB=0;  //Pueden ser de 24,16 u 8 bits por eso es int;
+  int CantOp,CodOp;
   TInstruc instruc;
 
   ComponentesInstruccion(InstruccionActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
@@ -209,6 +246,8 @@ void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int 
 }
 
 void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc){
+    instruc->OpA = 0;
+    instruc->OpB = 0;
 
     for (int i=0;i<instruc->TamB;i++){
         instruc->OpB+=MV->MEM[++DirFisicaActual];
@@ -227,7 +266,6 @@ void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc){
     // == 3 memoria 24 bits
 
 }
-
 
 void DefinoRegistro(unsigned char *Sec , int *CodOp, int Op){  //Defino el sector del registro en el que operare y el tipo de registro
   *Sec = (Op >> 2) & 0x03;
@@ -252,16 +290,14 @@ int LeoEnMemoria(TMV *MV,int Op){ // Guarda el valor de los 4 bytes de memoria e
 
     PosReg = direccionamiento_logtofis(MV,Op);
 
-    if ( ( PosReg >= (MV->TDS[0] & 0X0000FFFF) ) && (PosReg+3 <= TMEM)){ // si la posicion no es mas chica que la posicion inicial del registro en la memoria (ocurre si el offset se resta) y si la posicion es mas grande que el tamanio de la memoria
+    if (MV->Errores[2] != 1)
       for (int i=0;i<4;i++){
         aux+=MV->MEM[PosReg];
         PosReg++;
         if (4-i > 1)
             aux=aux << 8;
       }
-    }
-    else
-        MV->Errores[2]=1; //Fallo de segmento
+
     return aux;
 }
 
@@ -270,20 +306,18 @@ void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes 
 
     PosReg = direccionamiento_logtofis(MV,Op);
 
-    if ( ( PosReg >= (MV->TDS[0] & 0X0000FFFF) ) && (PosReg+3 <= TMEM)){
-          for (int i=0;i<4;i++){
-              MV->MEM[PosReg] = (Valor & 0XFF000000) >> 24;
-              PosReg++;
-              if (4-i > 1)
+    if (MV->Errores[2] != 1)
+        for (int i=0;i<4;i++){
+            MV->MEM[PosReg] = (Valor & 0XFF000000) >> 24;
+            PosReg++;
+            if (4-i > 1)
                 Valor=Valor << 8;
-          }
         }
-    else
-        MV->Errores[2]=1; //Fallo de segmento
+
 }
 
 void MOV(TMV * MV,TInstruc instruc){
-    int mover=0,PosReg,PosRegB,CodOpB;
+    int mover=0,CodOpB;
     unsigned char SecA,SecB;
 
     //OPB
@@ -326,13 +360,13 @@ void MOV(TMV * MV,TInstruc instruc){
 
 
 
-//---------------------------------------------------------------DEBUGGEAR-------------------------------------------------------------------
+//---------------------------------------------------------------DEBUG-------------------------------------------------------------------
 void muestramemoria(unsigned char memoria[]){
     int pos_i,pos_f;
     printf("Ingresar de que posicion a que posicion mostrar\n Pos_inicial: ");
-    scanf("%d",pos_i);
+    scanf("%d",&pos_i);
     printf("\nPos_final: ");
-    scanf("%d",pos_f);
+    scanf("%d",&pos_f);
 
     printf("\n------- MEMORIA -------\n");
     while(pos_i<=pos_f){
@@ -348,11 +382,11 @@ void muestraregistros(int reg[]){
     inicializoVecRegistros(VecRegistros);
     printf("\n------- REGISTROS -------\n");
     for(i=0;i<CANTREG;i++){
-        printf("%S : %04X \n",VecRegistros[i],reg[i]);
+        printf("%s : %08X \n",VecRegistros[i],reg[i]);
     }
 }
 
-void muestratds(unsigned int tds[]){
+void muestratds(int tds[]){
     int i;
     printf("\n------- TDS -------\n");
 
@@ -368,11 +402,11 @@ void muestravaloresmv(TMV mv){
 }
 
 char obtienetipooperacion(unsigned char operacion){
-  if (operacion&0x10==0x10)
+  if ((operacion&0x10)==0x10)
     return 2; //2 operandos
-  else if (operacion&0xF0==0)
+  else if ((operacion&0xF0)==0)
       return 0; //0 operandos
-    else if (operacion&0x30==0)
+    else if ((operacion&0x30)==0)
         return 1; //1 operando
     else
         return -1; //Error, no existe la operacion.
@@ -382,7 +416,7 @@ char obtienetipooperacion(unsigned char operacion){
 
 //----------------------------------------DISSASEMBLER----------------------------------------------------//
 
-
+/*
 void LeoInstruccionDissasembler(TMV *MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
 
     unsigned char Instruccion,SecB;
@@ -433,7 +467,7 @@ void LeoInstruccionDissasembler(TMV *MV,char VecFunciones[CANTFUNC][5],char VecR
     }
 }
 
-void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, int OpA, int OpB, int TamA, int TamB,unsigned short int PosInicial,unsigned short int PosMemoria){
+void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc ,unsigned short int PosInicial,unsigned short int PosMemoria){
 
     short int Offset;
     unsigned char CodReg,SecA,SecB;
@@ -534,4 +568,4 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
     else
         strcat(Segmento,"X");
 }
-
+*/
