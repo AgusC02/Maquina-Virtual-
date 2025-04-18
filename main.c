@@ -21,13 +21,18 @@ int main(int argc, char *argv[]){
     //PARA DEBUGEAR
     muestravaloresmv(MV);
     //
-    abort();
+
+    // abort();
     declaroFunciones(Funciones);
-    inicializoVecFunciones(VecFunciones); //No lleva & por que es un vector
+    inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
 
+    //if ((argv[2] !=0) && (strcmp(argv[2],"-d") == 0))
+        // DISASSEMBLER
 
+    // leoinstruccion()
 
+    /*
     int PosActual =  (( MV.TDS[(MV.R[IP] & 0XFFFF0000) >> 16] ) & 0XFFFF) >> 16 ;       // Pos Inicial IP
     int PosFinalCS = (( MV.TDS[(MV.R[CS] & 0XFFFF0000) >> 16] >> 16) & 0XFFFF) + TamCS; // Pos Inicial CS + TamCS = Pos Final CS
 
@@ -36,12 +41,10 @@ int main(int argc, char *argv[]){
         PosActual = ( ( MV.TDS[(MV.R[IP] & 0XFFFF0000) >> 16] ) >> 16 ) + (MV.R[IP] & 0XFFFF); // Inicio de IP + offset nuevo IP = Nuevo Pos Actual IP
     }
 
+
+    */ //--------------PASAR A LEO INSTRUCCION--------------------//
     if (MV.Errores[0] || MV.Errores[1] || MV.Errores[2])
         // ERRORES
-
-    if ((argv[2] !=0) && (strcmp(argv[2],"-d") == 0))
-        // DISASSEMBLER
-
 
     return 0;
 

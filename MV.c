@@ -150,9 +150,10 @@ int direccionamiento_logtofis(TMV *MV, int reg){
 }
 
 void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
-
+ // Leo instruccion recibe la mv seteada y se encarga de leer y depurar todas las instrucciones - pasar del main al leo instrucción
   unsigned char InstruccionActual; //La instruccion son 8 bits
   int DirFisicaActual = direccionamiento_logtofis(MV,IP);
+
 
   InstruccionActual = MV->MEM[DirFisicaActual];
 
@@ -319,6 +320,13 @@ void MOV(TMV * MV,TInstruc instruc){
 
 }
 
+
+
+
+
+
+
+//---------------------------------------------------------------DEBUGGEAR-------------------------------------------------------------------
 void muestramemoria(unsigned char memoria[]){
     int pos_i,pos_f;
     printf("Ingresar de que posicion a que posicion mostrar\n Pos_inicial: ");
@@ -361,15 +369,169 @@ void muestravaloresmv(TMV mv){
 
 char obtienetipooperacion(unsigned char operacion){
   if (operacion&0x10==0x10)
-    return 2; //2 operandos    
+    return 2; //2 operandos
   else if (operacion&0xF0==0)
       return 0; //0 operandos
     else if (operacion&0x30==0)
         return 1; //1 operando
-    else 
+    else
         return -1; //Error, no existe la operacion.
 }
 
 
 
+//----------------------------------------DISSASEMBLER----------------------------------------------------//
+
+
+void LeoInstruccionDissasembler(TMV *MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
+
+    unsigned char Instruccion,SecB;
+    int OpA,OpB,CodOp,CantOp,TamOpA,TamOpB,AuxOpA,AuxOpB,AuxRB;
+    unsigned short int PosMemoria=0,PosMemoriaAux = 0,PosInicial;
+
+
+    DefinoRegistro(&SecB,&OpB);
+    DefinoAuxRegistro(&AuxRB,*MV,SecB,OpB);
+
+    while (PosMemoria < (MV->TDS[0] & 0x0000FFFF)) {  //Mientras la posicion sea menor al tamaño del codigo
+
+        PosInicial=PosMemoria;
+        PosMemoriaAux=PosMemoria;
+        Instruccion = MV->M[PosMemoria];
+        LeoTipoInstruccion(Instruccion,&OpA,&OpB,&CodOp,&CantOp);
+
+        TamOpA = (~(OpA) & 0x03);
+        TamOpB = (~(OpB) & 0x03);
+
+        AuxOpA=0;
+        AuxOpB=0;
+
+        if (CantOp == 2) {                      //Guardo los operandos en auxiliares
+            for (int j = 0; j < TamOpB; j++) {
+                AuxOpB += MV->M[++PosMemoriaAux];
+                if (TamOpB-j > 1)
+                    AuxOpB = AuxOpB << 8;
+            }
+            for (int i = 0; i < TamOpA; i++) {
+                AuxOpA += MV->M[++PosMemoriaAux];
+                if (TamOpA-i > 1)
+                    AuxOpA = AuxOpA << 8;
+            }
+        }
+        else
+           if (CantOp == 1)
+             for (int i = 0; i < TamOpA; i++) {
+                AuxOpA += MV->M[++PosMemoriaAux];
+                if (TamOpA-i > 1)
+                    AuxOpA = AuxOpA << 8;
+             }
+
+
+        PosMemoria += TamOpA+TamOpB+1; // Posicion de la Siguiente instruccion
+
+        EscriboDissasembler(*MV ,VecFunciones,VecRegistros,CodOp,AuxOpA,AuxOpB,TamOpA,TamOpB,PosInicial,PosMemoria);
+    }
+}
+
+void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, int OpA, int OpB, int TamA, int TamB,unsigned short int PosInicial,unsigned short int PosMemoria){
+
+    short int Offset;
+    unsigned char CodReg,SecA,SecB;
+    int i;
+    char AuxSeg[4];
+
+    printf("[%04X] ",PosInicial); //Muestro posicion de la memoria indicada, hexadecimal de 4 partes , 4 nibbles
+
+    //Muestro los 8 bits del tipo de instruccion, luego los valores de los operandos
+
+    for (i=PosInicial;i<PosMemoria;i++){
+        printf("%02X ",MV.M[i]); //Lo guardo en hexadecimal en dos partes. Primero se lee OpBOpA y luego COdOp y luego los valores de los operandos
+    }
+
+    //Tabulaciones
+
+    if (TamA+TamB > 4)
+        printf("\t| ");
+    else
+        if (TamA+TamB > 1)
+          printf("\t\t| ");
+    else
+        printf("\t\t\t| ");
+
+    printf("%s \t",VecFunciones[CodOp]); //Muestro operacion
+
+
+    //Muestro ASM
+
+    if (TamA != 0) {
+        if (TamA == 3) { //Memoria
+            CodReg = (OpA >> 16) & 0xF;
+            Offset = OpA & 0xFFFF;
+            if (CodReg !=0)
+              if (CodReg>=10)
+                  printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
+                else
+                    printf("[%s+%d]",VecRegistros[CodReg],Offset);
+            else
+                printf("[%d]",Offset);
+        }
+        else
+          if (TamA == 2) { //inmediato
+             printf("%hd", OpA);
+        }
+        else { //Registro
+            DefinoRegistro(&SecA,&OpA);
+            if (OpA >= 10){
+                strcpy(AuxSeg,VecRegistros[OpA]);
+                GuardoSector(AuxSeg,SecA);
+                if (SecA == 0)
+                   printf("%c%s",'E',AuxSeg);
+                else
+                  printf("%s",AuxSeg);
+            }
+            else
+               printf("%s",VecRegistros[OpA]);
+        }
+
+        if (TamB!=0) {
+            printf(", ");
+            if (TamB == 3) {  //Memoria
+                CodReg = (OpB >> 16)& 0xF;
+                Offset = OpB & 0xFFFF;
+                if (CodReg>=10)
+                  printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
+                else
+                    printf("[%s+%d]",VecRegistros[CodReg],Offset);
+            }
+            else
+                if (TamB == 2) {  //Inmediato
+                  printf("%hd", OpB);
+               }
+                else { //Registro
+                  DefinoRegistro(&SecB,&OpB);
+                  if (OpB >= 10){
+                     strcpy(AuxSeg,VecRegistros[OpB]);
+                     GuardoSector(AuxSeg,SecB);
+                     if (SecB == 0)
+                        printf("%c%s",'E',AuxSeg);
+                     else
+                        printf("%s",AuxSeg);
+                 }
+                 else
+                    printf("%s",VecRegistros[OpB]);
+                }
+        }
+    }
+  printf("\n");
+}
+
+void GuardoSector(char Segmento[4],unsigned char Sec){
+  if (Sec == 1)
+        strcat(Segmento,"L");
+  else
+    if (Sec == 2)
+        strcat(Segmento,"H");
+    else
+        strcat(Segmento,"X");
+}
 
