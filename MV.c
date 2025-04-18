@@ -166,8 +166,8 @@ int direccionamiento_logtofis(TMV *MV, int reg){
     LimiteSup = DirBase + TamSeg;
 
     if (!( (DirBase >= DirFisica ) && (DirFisica + 4 <= LimiteSup  ) )){
-        MV->Errores[2] = 1; //Fallo de segmento
-        return 0;        // Deberia cortar el programa CORREGIR
+        generaerror(2);
+        return -1;        // Aca nunca va a llegar si llama a generaerror, porque la ultima instruccion de la funcion es abort().
     }
     else
         return DirBase+Offset;
