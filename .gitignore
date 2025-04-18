@@ -1,3 +1,7 @@
 **/.main.o
 **/.MV.o
 **/.vscode
+**/.MV.depend
+**/.MV.layout
+**/bin/
+**/obj/
