@@ -326,8 +326,11 @@ void MOV(TMV * MV,TInstruc instruc){
         DefinoAuxRegistro(&mover,*MV,SecB,CodOpB);  //En mover (auxregistro) guardo el puntero a memoria que debo guardar, ya sea, el 3,4,34,o 1234 bytes.
     }
     else
-      if (instruc.TamB == 2)  //Inmediato
+      if (instruc.TamB == 2){  //Inmediato
          mover=instruc.OpB;
+         mover = mover << 16;
+         mover = mover >> 16;
+      }
       else
         if (instruc.TamB == 3) //Memoria, debo sumar todos los valores dentro de la memoria y guardarlo en mover.
             mover = LeoEnMemoria(MV,instruc.OpB);
@@ -354,7 +357,59 @@ void MOV(TMV * MV,TInstruc instruc){
 
 }
 
+void ADD(TMV * MV,TInstruc instruc){
+    int sumar=0,PosReg,TamModif;
+    unsigned char SecA,SecB;
 
+    //OPB
+    if (instruc.TamB == 1){ //Si Op2 es de registro, sumo el valor del puntero a memoria, por ejemplo 00 00 00 08
+        DefinoRegistro(&SecB,&CodOpB,instruc.OpB);
+        DefinoAuxRegistro(&sumar,*MV,SecB,CodOpB);
+    }
+    else
+      if (instruc.TamB == 2){  //Inmediato
+         sumar = OpB;
+         sumar = sumar << 16;
+         sumar = sumar >> 16;
+      }
+      else
+        if (instruc.TamB == 3) //Memoria, debo sumar todos los valores dentro de la memoria y guardarlo en sumar.
+            sumar = LeoEnMemoria(MV,instruc.OpB);
+
+    //OPA
+    if (instruc.TamA == 1){ //Si Op1 es de registro, debo sumar la posicion de memoria del registro actual con la que me diga el Op1
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1) //4 byte
+            MV->R[OpA] = (MV->R[OpA] & 0XFFFFFF00) + ( ( (MV->R[OpA] & 0x000000FF) + (sumar & 0XFF) ) & 0XFF );  // MODIFICAR
+        else
+            if (SecA == 2){ //3 byte
+                MV->R[OpA] = (MV->R[OpA] & 0XFFFF00FF) + ( ( (MV->R[OpA] & 0x0000FF00) + ( (sumar & 0XFF) << 8) ) & 0x0000FF00);
+            }
+            else
+                if (SecA == 3) //3 y 4 byte
+                    MV->R[OpA] = (MV->R[OpA] & 0XFFFF0000) + ( ( (MV->R[OpA] & 0x0000FFFF) +  (sumar & 0XFFFF) ) & 0x0000FFFF );
+                else //Los 4 bytes
+                    MV->R[OpA] += sumar;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,OpA);
+      modificoCC(MV,ResultadoSeg); //ResultadoSeg guarda el resultado del segmento que fue modificado, con el fin de modificar condition code
+    }
+     else{ //Es memoria ya que no se puede guardar nada en un inmediato
+        int AuxSuma;
+        AuxSuma = GuardoValorMemoria(MV,OpA) + sumar;
+        modificoCC(MV,AuxSuma);
+        PosReg = CalculoMemoria(MV,OpA);
+        TamModif = CalculoTamModif(*MV,OpA);
+
+        for (int i=TamModif-1;i>=0;i--){
+              MV->M[PosReg+i] = (AuxSuma & 0X000000FF);
+              AuxSuma = AuxSuma >> 8;
+          }
+    }
+
+
+}
 
 
 
