@@ -39,6 +39,8 @@ typedef struct TMV{
 
 typedef struct TInstruc{
   int OpA,OpB,TamA,TamB; // OpA = Valor A
+  unsigned char inst;
+  char tipoinstruccion; //Instruccion
 }TInstruc;
 
 
@@ -64,6 +66,7 @@ void muestramemoria(unsigned char memoria[]);
 void muestraregistros(int reg[]);
 void muestratds(unsigned int tds[]);
 void muestravaloresmv(TMV mv);
+char obtienetipooperacion(unsigned char operacion);
 
 //FUNCIONES
 
