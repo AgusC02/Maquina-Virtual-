@@ -62,9 +62,11 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int Op);
 int LeoEnMemoria(TMV *MV,int Op);
 int GuardoValorMemoria(TMV *MV,int Op);
 void EscriboEnMemoria(TMV *MV,int Op, int Valor);
+
+//DEBUG
 void muestramemoria(unsigned char memoria[]);
 void muestraregistros(int reg[]);
-void muestratds(unsigned int tds[]);
+void muestratds(int tds[]);
 void muestravaloresmv(TMV mv);
 char obtienetipooperacion(unsigned char operacion);
 
@@ -124,5 +126,10 @@ void NOT(TMV * MV,TInstruc instruc);
 //0 OPERANDOS
 
 void STOP(TMV * MV,TInstruc instruc);
+
+// DISSASSEMBLER
+void LeoInstruccionDissasembler(TMV *MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
+void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc,unsigned short int PosInicial,unsigned short int PosMemoria);
+void GuardoSector(char Segmento[4],unsigned char Sec);
 
 #endif // MV_H_INCLUDED
