@@ -259,10 +259,10 @@ void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc){
 
 }
 
-void DefinoRegistro(unsigned char *Sec , int *CodOp, int Op){  //Defino el sector del registro en el que operare y el tipo de registro
+void DefinoRegistro(unsigned char *Sec , int *CodReg, int Op){  //Defino el sector del registro en el que operare y el tipo de registro
   *Sec = (Op >> 2) & 0x03;
-  *CodOp = (Op >> 4) & 0xF;
-}
+  *CodReg = (Op >> 4) & 0xF;
+}// Devuelve Sector y Codigo de Registro.
 
 void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago las posiciones del registro de 32 bytes en el que asignare a otro registro/memoria
   if (Sec == 1)
@@ -294,6 +294,9 @@ int LeoEnMemoria(TMV *MV,int Op){ // Guarda el valor de los 4 bytes de memoria e
 }
 
 void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes de la memoria, se usa solo para el MOV
+    
+    //HAY QUE CHECKEAR ESTA FUNCION, LA USAMOS MUCHO Y TENEMOS QUE CHECKEAR SI OCURRE FALLO DE SEGMENTO.
+    
     int PosReg;
 
     PosReg = direccionamiento_logtofis(MV,Op);
@@ -560,4 +563,116 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
     else
         strcat(Segmento,"X");
 }
+*/
+void SWAP(TMV *MV,TInstruc instruccion){
+    // Intercambia los valores de los dos operandos (ambos deben ser registros y/o celdas de memoria)
+    // IDEA: SACO EL PRIMER OPERANDO A UN AUXILIAR, PONGO LO DEL SEGUNDO OPERANDO EN EL PRIMERO, Y PONGO LO DEL AUXILIAR EN EL SEGUNDO OPERANDO.
+
+    int auxA=0,auxB=0,codregA,codregB,regA,regB;
+    unsigned char secA=0,secB=0;
+
+    //Saco primer operando a un auxiliar.
+    if(instruccion.TamA==1){ //Si el operando A es registro.
+        DefinoRegistro(&secA,&codregA,auxA);
+        DefinoAuxRegistro(&regA,*MV,secA,codregA);
+        auxA=regA;
+    }
+    else{ // El operando A es de memoria.
+        auxA=LeoEnMemoria(MV,instruccion.OpA);
+    }
+    
+    
+    //Saco segundo operando a un auxiliar.
+    if(instruccion.TamB==1){
+        DefinoRegistro(&secB,&codregB,auxB);
+        DefinoAuxRegistro(&regB,*MV,secB,codregB);
+        auxB=regB;
+    }
+    else{
+        auxB=LeoEnMemoria(MV,instruccion.OpB);
+    }
+    
+    
+    // Hago "el MOV OpA,AuxB"
+    if(instruccion.TamA==1){ //OPERANDO A ES REGISTRO
+        if (secA==0){ 
+            MV->R[codregA]=auxB;
+        }
+        else if (secA==3){
+            MV->R[codregA]=MV->R[codregA]& 0xFFFF0000;
+            MV->R[codregA]=MV->R[codregA] & (auxB & 0x0000FFFF);
+        }
+        else if(secA==2){
+            MV->R[codregA]=MV->R[codregA]& 0xFFFF00FF;
+            MV->R[codregA]=MV->R[codregA] & (auxB<<8); // Checkear esto, parece raro y capaz con algun char se arreglaria. PUEDE ESTAR BIEN.
+        }
+        else{ // secA==1 (AL)
+            MV->R[codregA]=MV->R[codregA] & 0xFFFFFF00;
+            MV->R[codregA]=MV->R[codregA] & (auxB & 0x000000FF);
+        }
+    }
+    else{ //OPERANDO A ES MEMORIA
+        EscriboEnMemoria(MV,instruccion.OpA,auxB);
+    }
+
+    
+    //Hago "el MOV OpB,AuxA"
+    if(instruccion.TamB==1){ //OPERANDO B ES REGISTRO
+        if (secB==0){ 
+            MV->R[codregB]=auxA;
+        }
+        else if (secB==3){
+            MV->R[codregB]=MV->R[codregB]& 0xFFFF0000;
+            MV->R[codregB]=MV->R[codregB] & (auxA & 0x0000FFFF);
+        }
+        else if(secB==2){
+            MV->R[codregB]=MV->R[codregB]& 0xFFFF00FF;
+            MV->R[codregB]=MV->R[codregB] & (auxA<<8); // Checkear esto, parece raro y capaz con algun char se arreglaria. PUEDE ESTAR BIEN.
+        }
+        else{ // secB==1 (AL)
+            MV->R[codregB]=MV->R[codregB] & 0xFFFFFF00;
+            MV->R[codregB]=MV->R[codregB] & (auxA & 0x000000FF);
+        }
+    }
+    else{ //OPERANDO B ES MEMORIA
+        EscriboEnMemoria(MV,instruccion.OpB,auxA);
+    }
+}
+
+/*    
+        if(instruccion.TamA==1){ // Es un swap de registro a registro.
+
+
+
+
+            if (secA==0){
+                auxA=MV->R[codregA];
+                if(secB==0){ // SWAP EAX,EBX
+                    //auxA=MV->R[codregA];
+                    MV->R[codregA]=MV->R[codregB];
+                    MV->R[codregB]=auxA;
+                }
+                else if(secB==1){ // SWAP EAX,AL
+                    MV->R[codregA]=regB;
+                }
+                else if(secB==2)
+                    MV->R[codregA]=regB
+            }else if (secA==3){ // SWAP EAX,EBX
+                            
+            }
+
+
+        }
+        else{ // Es un swap de registro a memoria.
+
+        }
+    }
+    else{ // El operando A es de memoria.
+        if(instruccion.tamB==1){ // SWAP MEMORIA/REGISTRO
+
+        }
+        else{ // SWAP MEMORIA/MEMORIA
+
+        }
+    }
 */
