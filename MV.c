@@ -202,13 +202,13 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
             if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
                SeteoValorOp(MV, direccionamiento_logtofis(MV,MV->R[IP]), &instruc); // Distingue entre uno o dos operandos a setear
            // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
-        
+           
+           //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS. 
+            MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
         
         }else
             generaerror(1);
-        //Avanzo a la proxima instruccion.
-        MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
     }
 }
 
@@ -407,6 +407,25 @@ char obtienetipooperacion(unsigned char operacion){
         return -1; //Error, no existe la operacion.
 }
 
+char sobrepasaCS(TMV MV,int asignable){
+    if(asignable>MV.TDS[CS]&0x0000FFFF)
+        return 1;
+    else
+        return 0;
+}
+
+int devuelveN(TMV *MV){
+    int i;
+    i=((*MV).R[CC]>>31) & 1;
+    return i;
+}
+
+
+int devuelveZ(TMV *MV){
+    int i;
+    i=((*MV).R[CC]>>30) & 1;
+    return i;
+}
 
 
 //----------------------------------------DISSASEMBLER----------------------------------------------------//
@@ -639,40 +658,173 @@ void SWAP(TMV *MV,TInstruc instruccion){
     }
 }
 
-/*    
-        if(instruccion.TamA==1){ // Es un swap de registro a registro.
+// -------------------------------------- FUNCIONES CON 1 OPERANDO
+void JMP (TMV *MV,TInstruc instruccion){
+    //Efectua un salto incondicional a la celda del segmento de codigo indicada en el operando.
+    int asignable,auxCodReg,auxReg;
+    unsigned char auxSecReg;
 
 
-
-
-            if (secA==0){
-                auxA=MV->R[codregA];
-                if(secB==0){ // SWAP EAX,EBX
-                    //auxA=MV->R[codregA];
-                    MV->R[codregA]=MV->R[codregB];
-                    MV->R[codregB]=auxA;
-                }
-                else if(secB==1){ // SWAP EAX,AL
-                    MV->R[codregA]=regB;
-                }
-                else if(secB==2)
-                    MV->R[codregA]=regB
-            }else if (secA==3){ // SWAP EAX,EBX
-                            
-            }
-
-
-        }
-        else{ // Es un swap de registro a memoria.
-
-        }
+    if(instruccion.TamA==1){ // Operando de registro
+        DefinoRegistro(&auxSecReg,&auxCodReg,instruccion.OpA);
+        DefinoAuxRegistro(&auxReg,*MV,auxSecReg,auxCodReg);
+        asignable=auxReg;
     }
-    else{ // El operando A es de memoria.
-        if(instruccion.tamB==1){ // SWAP MEMORIA/REGISTRO
-
-        }
-        else{ // SWAP MEMORIA/MEMORIA
-
-        }
+    else if (instruccion.TamA==2){ // Operando inmediato
+        asignable=instruccion.OpA;
+    }else if (instruccion.TamA==3){ // Operando de memoria
+        asignable=LeoEnMemoria(MV,instruccion.OpA);
     }
-*/
+
+    // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
+    if (sobrepasaCS(*MV,asignable)==1)
+        generaerror(2);
+    
+    MV->R[IP]=asignable;
+
+}
+
+void JZ (TMV *MV,TInstruc instruccion){
+    int asignable,auxCodReg,auxReg;
+    unsigned char auxSecReg;
+
+    if(devuelveZ(MV)==1){
+        if(instruccion.TamA==1){ // Operando de registro
+            DefinoRegistro(&auxSecReg,&auxCodReg,instruccion.OpA);
+            DefinoAuxRegistro(&auxReg,*MV,auxSecReg,auxCodReg);
+            asignable=auxReg;
+        }
+        else if (instruccion.TamA==2){ // Operando inmediato
+            asignable=instruccion.OpA;
+        }else if (instruccion.TamA==3){ // Operando de memoria
+            asignable=LeoEnMemoria(MV,instruccion.OpA);
+        }
+    
+        // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
+        if (sobrepasaCS(*MV,asignable)==1)
+            generaerror(2);
+        
+        MV->R[IP]=asignable;
+    }
+}
+
+void JP (TMV *MV,TInstruc instruccion){
+    int asignable,auxCodReg,auxReg;
+    unsigned char auxSecReg;
+
+    if((devuelveN(MV)==0) && (devuelveZ(MV)==0)){
+        if(instruccion.TamA==1){ // Operando de registro
+            DefinoRegistro(&auxSecReg,&auxCodReg,instruccion.OpA);
+            DefinoAuxRegistro(&auxReg,*MV,auxSecReg,auxCodReg);
+            asignable=auxReg;
+        }
+        else if (instruccion.TamA==2){ // Operando inmediato
+            asignable=instruccion.OpA;
+        }else if (instruccion.TamA==3){ // Operando de memoria
+            asignable=LeoEnMemoria(MV,instruccion.OpA);
+        }
+    
+        // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
+        if (sobrepasaCS(*MV,asignable)==1)
+            generaerror(2);
+        
+        MV->R[IP]=asignable;
+    }
+}
+
+void JN (TMV *MV,TInstruc instruccion){
+    int asignable,auxCodReg,auxReg;
+    unsigned char auxSecReg;
+
+    if (devuelveN(MV)==1){
+        if(instruccion.TamA==1){ // Operando de registro
+            DefinoRegistro(&auxSecReg,&auxCodReg,instruccion.OpA);
+            DefinoAuxRegistro(&auxReg,*MV,auxSecReg,auxCodReg);
+            asignable=auxReg;
+        }
+        else if (instruccion.TamA==2){ // Operando inmediato
+            asignable=instruccion.OpA;
+        }else if (instruccion.TamA==3){ // Operando de memoria
+            asignable=LeoEnMemoria(MV,instruccion.OpA);
+        }
+    
+        // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
+        if (sobrepasaCS(*MV,asignable)==1)
+            generaerror(2);
+        
+        MV->R[IP]=asignable;
+    }
+}
+
+void JNZ (TMV *MV,TInstruc instruccion){
+    int asignable,auxCodReg,auxReg;
+    unsigned char auxSecReg;
+    
+    if(devuelveZ(MV)==0){
+        if(instruccion.TamA==1){ // Operando de registro
+            DefinoRegistro(&auxSecReg,&auxCodReg,instruccion.OpA);
+            DefinoAuxRegistro(&auxReg,*MV,auxSecReg,auxCodReg);
+            asignable=auxReg;
+        }
+        else if (instruccion.TamA==2){ // Operando inmediato
+            asignable=instruccion.OpA;
+        }else if (instruccion.TamA==3){ // Operando de memoria
+            asignable=LeoEnMemoria(MV,instruccion.OpA);
+        }
+    
+        // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
+        if (sobrepasaCS(*MV,asignable)==1)
+            generaerror(2);
+        
+        MV->R[IP]=asignable;
+    }
+}
+
+void JNP (TMV *MV, TInstruc instruccion){
+    int asignable,auxCodReg,auxReg;
+    unsigned char auxSecReg;
+
+    if(devuelveN(MV)==1 || devuelveZ(MV)==1){
+        if(instruccion.TamA==1){ // Operando de registro
+            DefinoRegistro(&auxSecReg,&auxCodReg,instruccion.OpA);
+            DefinoAuxRegistro(&auxReg,*MV,auxSecReg,auxCodReg);
+            asignable=auxReg;
+        }
+        else if (instruccion.TamA==2){ // Operando inmediato
+            asignable=instruccion.OpA;
+        }else if (instruccion.TamA==3){ // Operando de memoria
+            asignable=LeoEnMemoria(MV,instruccion.OpA);
+        }
+    
+        // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
+        if (sobrepasaCS(*MV,asignable)==1)
+            generaerror(2);
+        
+        MV->R[IP]=asignable;
+    }
+}
+
+void JNN (TMV *MV, TInstruc instruccion){
+    int asignable,auxCodReg,auxReg;
+    unsigned char auxSecReg;
+
+    if(devuelveN(MV)==0){
+        if(instruccion.TamA==1){ // Operando de registro
+            DefinoRegistro(&auxSecReg,&auxCodReg,instruccion.OpA);
+            DefinoAuxRegistro(&auxReg,*MV,auxSecReg,auxCodReg);
+            asignable=auxReg;
+        }
+        else if (instruccion.TamA==2){ // Operando inmediato
+            asignable=instruccion.OpA;
+        }else if (instruccion.TamA==3){ // Operando de memoria
+            asignable=LeoEnMemoria(MV,instruccion.OpA);
+        }
+    
+        // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
+        if (sobrepasaCS(*MV,asignable)==1)
+            generaerror(2);
+        
+        MV->R[IP]=asignable;
+    }
+}
+
