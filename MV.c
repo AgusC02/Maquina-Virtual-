@@ -192,15 +192,15 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
     declaroFunciones(Funciones);
 
-    int DirFisicaActual = direccionamiento_logtofis(MV,MV->R[IP]);
+    int DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
     finCS=posmaxCODESEGMENT(MV);
 
-    while(direccionamiento_logtofis(MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
-        ComponentesInstruccion(direccionamiento_logtofis(MV,MV->R[IP]),&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
+    while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
+        ComponentesInstruccion(direccionamiento_logtofis(*MV,MV->R[IP]),&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
 
             if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
-               SeteoValorOp(MV, direccionamiento_logtofis(MV,MV->R[IP]), &instruc); // Distingue entre uno o dos operandos a setear
+               SeteoValorOp(MV, direccionamiento_logtofis(*MV,MV->R[IP]), &instruc); // Distingue entre uno o dos operandos a setear
            // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
            
            //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS. 
@@ -259,7 +259,7 @@ void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc){
 
 }
 
-void DefinoRegistro(unsigned char *Sec , unsigned char *CodOp, int Op){  //Defino el sector del registro en el que operare y el tipo de registro
+void DefinoRegistro(unsigned char *Sec , unsigned char *CodReg, int Op){  //Defino el sector del registro en el que operare y el tipo de registro
   *Sec = (Op >> 2) & 0x03;
   *CodReg = (Op >> 4) & 0xF;
 }// Devuelve Sector y Codigo de Registro.
@@ -1024,7 +1024,7 @@ void SWAP(TMV *MV,TInstruc instruccion){
         auxA=regA;
     }
     else{ // El operando A es de memoria.
-        auxA=LeoEnMemoria(MV,instruccion.OpA);
+        auxA=LeoEnMemoria(*MV,instruccion.OpA);
     }
     
     
@@ -1035,7 +1035,7 @@ void SWAP(TMV *MV,TInstruc instruccion){
         auxB=regB;
     }
     else{
-        auxB=LeoEnMemoria(MV,instruccion.OpB);
+        auxB=LeoEnMemoria(*MV,instruccion.OpB);
     }
     
     
@@ -1100,7 +1100,7 @@ void JMP (TMV *MV,TInstruc instruccion){
     else if (instruccion.TamA==2){ // Operando inmediato
         asignable=instruccion.OpA;
     }else if (instruccion.TamA==3){ // Operando de memoria
-        asignable=LeoEnMemoria(MV,instruccion.OpA);
+        asignable=LeoEnMemoria(*MV,instruccion.OpA);
     }
 
     // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
@@ -1124,7 +1124,7 @@ void JZ (TMV *MV,TInstruc instruccion){
         else if (instruccion.TamA==2){ // Operando inmediato
             asignable=instruccion.OpA;
         }else if (instruccion.TamA==3){ // Operando de memoria
-            asignable=LeoEnMemoria(MV,instruccion.OpA);
+            asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
     
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
@@ -1148,7 +1148,7 @@ void JP (TMV *MV,TInstruc instruccion){
         else if (instruccion.TamA==2){ // Operando inmediato
             asignable=instruccion.OpA;
         }else if (instruccion.TamA==3){ // Operando de memoria
-            asignable=LeoEnMemoria(MV,instruccion.OpA);
+            asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
     
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
@@ -1172,7 +1172,7 @@ void JN (TMV *MV,TInstruc instruccion){
         else if (instruccion.TamA==2){ // Operando inmediato
             asignable=instruccion.OpA;
         }else if (instruccion.TamA==3){ // Operando de memoria
-            asignable=LeoEnMemoria(MV,instruccion.OpA);
+            asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
     
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
@@ -1196,7 +1196,7 @@ void JNZ (TMV *MV,TInstruc instruccion){
         else if (instruccion.TamA==2){ // Operando inmediato
             asignable=instruccion.OpA;
         }else if (instruccion.TamA==3){ // Operando de memoria
-            asignable=LeoEnMemoria(MV,instruccion.OpA);
+            asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
     
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
@@ -1220,7 +1220,7 @@ void JNP (TMV *MV, TInstruc instruccion){
         else if (instruccion.TamA==2){ // Operando inmediato
             asignable=instruccion.OpA;
         }else if (instruccion.TamA==3){ // Operando de memoria
-            asignable=LeoEnMemoria(MV,instruccion.OpA);
+            asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
     
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
@@ -1244,7 +1244,7 @@ void JNN (TMV *MV, TInstruc instruccion){
         else if (instruccion.TamA==2){ // Operando inmediato
             asignable=instruccion.OpA;
         }else if (instruccion.TamA==3){ // Operando de memoria
-            asignable=LeoEnMemoria(MV,instruccion.OpA);
+            asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
     
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
