@@ -198,17 +198,17 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
     while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
         ComponentesInstruccion(DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
-        
+
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
 
             if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
                SeteoValorOp(MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
            // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
-           
-           //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS. 
+
+           //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS.
             MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
-        
+
         }else
             generaerror(1);
     }
@@ -306,9 +306,9 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
 }
 
 void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes de la memoria, se usa solo para el MOV
-    
+
     //HAY QUE CHECKEAR ESTA FUNCION, LA USAMOS MUCHO Y TENEMOS QUE CHECKEAR SI OCURRE FALLO DE SEGMENTO.
-    
+
     int PosReg;
 
     PosReg = direccionamiento_logtofis(*MV,Op);
@@ -322,12 +322,12 @@ void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes 
 }
 
 void modificoCC(TMV *MV,int Resultado){
-  MV->R[8] = MV->R[8] & 0x00000000;
+  MV->R[CC] = MV->R[CC] & 0x00000000;
     if (Resultado < 0)
-        MV->R[8] = 0x80000000;
+        MV->R[CC] = 0x80000000;
     else
       if (Resultado == 0)
-         MV->R[8] = 0x40000000;
+         MV->R[CC] = 0x40000000;
 }
 
 void guardoOpB(TMV MV, TInstruc instruc, int *auxOpB){
@@ -448,6 +448,84 @@ void SUB(TMV * MV,TInstruc instruc){
     }
 
 
+}
+
+void SWAP(TMV *MV,TInstruc instruccion){
+    // Intercambia los valores de los dos operandos (ambos deben ser registros y/o celdas de memoria)
+    // IDEA: SACO EL PRIMER OPERANDO A UN AUXILIAR, PONGO LO DEL SEGUNDO OPERANDO EN EL PRIMERO, Y PONGO LO DEL AUXILIAR EN EL SEGUNDO OPERANDO.
+
+    int auxA=0,auxB=0,codregA,codregB,regA,regB;
+    unsigned char secA=0,secB=0;
+
+    //Saco primer operando a un auxiliar.
+    if(instruccion.TamA==1){ //Si el operando A es registro.
+        DefinoRegistro(&secA,&codregA,auxA);
+        DefinoAuxRegistro(&regA,*MV,secA,codregA);
+        auxA=regA;
+    }
+    else{ // El operando A es de memoria.
+        auxA=LeoEnMemoria(*MV,instruccion.OpA);
+    }
+
+
+    //Saco segundo operando a un auxiliar.
+    if(instruccion.TamB==1){
+        DefinoRegistro(&secB,&codregB,auxB);
+        DefinoAuxRegistro(&regB,*MV,secB,codregB);
+        auxB=regB;
+    }
+    else{
+        auxB=LeoEnMemoria(*MV,instruccion.OpB);
+    }
+
+
+    // Hago "el MOV OpA,AuxB"
+    if(instruccion.TamA==1){ //OPERANDO A ES REGISTRO
+        if (secA==0){
+            MV->R[codregA]=auxB;
+        }
+        else if (secA==3){ // AX
+            MV->R[codregA]=MV->R[codregA]& 0xFFFF0000;
+            MV->R[codregA]=MV->R[codregA] & (auxB & 0x0000FFFF);
+        }
+        else if(secA==2){ // AH
+            MV->R[codregA]=MV->R[codregA]& 0xFFFF00FF;
+            auxB=auxB & 0xFF;
+            MV->R[codregA]=MV->R[codregA] & (auxB<<8);
+
+        }
+        else{ // secA==1 (AL)
+            MV->R[codregA]=MV->R[codregA] & 0xFFFFFF00;
+            MV->R[codregA]=MV->R[codregA] & (auxB & 0x000000FF);
+        }
+    }
+    else{ //OPERANDO A ES MEMORIA
+        EscriboEnMemoria(MV,instruccion.OpA,auxB);
+    }
+
+
+    //Hago "el MOV OpB,AuxA"
+    if(instruccion.TamB==1){ //OPERANDO B ES REGISTRO
+        if (secB==0){
+            MV->R[codregB]=auxA;
+        }
+        else if (secB==3){
+            MV->R[codregB]=MV->R[codregB]& 0xFFFF0000;
+            MV->R[codregB]=MV->R[codregB] & (auxA & 0x0000FFFF);
+        }
+        else if(secB==2){
+            MV->R[codregB]=MV->R[codregB]& 0xFFFF00FF;
+            auxA=auxA & 0xFF;
+            MV->R[codregB]=MV->R[codregB] & (auxA<<8);
+        }
+        else{ // secB==1 (AL)
+            MV->R[codregB]=MV->R[codregB] & 0xFFFFFF00;
+            MV->R[codregB]=MV->R[codregB] & (auxA & 0x000000FF);
+        }
+    }
+    else{ //OPERANDO B ES MEMORIA
+        EscriboEnMemoria(MV,instruccion.OpB,auxA);
+    }
 }
 
 void MUL(TMV * MV,TInstruc instruc){
@@ -837,7 +915,7 @@ char obtienetipooperacion(unsigned char operacion){
 }
 
 char sobrepasaCS(TMV MV,int asignable){
-    
+
     if(asignable>=posmaxCODESEGMENT(MV))
         return 1;
     else
@@ -1013,83 +1091,7 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
         strcat(Segmento,"X");
 }
 */
-void SWAP(TMV *MV,TInstruc instruccion){
-    // Intercambia los valores de los dos operandos (ambos deben ser registros y/o celdas de memoria)
-    // IDEA: SACO EL PRIMER OPERANDO A UN AUXILIAR, PONGO LO DEL SEGUNDO OPERANDO EN EL PRIMERO, Y PONGO LO DEL AUXILIAR EN EL SEGUNDO OPERANDO.
 
-    int auxA=0,auxB=0,codregA,codregB,regA,regB;
-    unsigned char secA=0,secB=0;
- 
-    //Saco primer operando a un auxiliar.
-    if(instruccion.TamA==1){ //Si el operando A es registro.
-        DefinoRegistro(&secA,&codregA,auxA);
-        DefinoAuxRegistro(&regA,*MV,secA,codregA);
-        auxA=regA;
-    }
-    else{ // El operando A es de memoria.
-        auxA=LeoEnMemoria(*MV,instruccion.OpA);
-    }
-    
-    
-    //Saco segundo operando a un auxiliar.
-    if(instruccion.TamB==1){
-        DefinoRegistro(&secB,&codregB,auxB);
-        DefinoAuxRegistro(&regB,*MV,secB,codregB);
-        auxB=regB;
-    }
-    else{
-        auxB=LeoEnMemoria(*MV,instruccion.OpB);
-    }
-    
-    
-    // Hago "el MOV OpA,AuxB"
-    if(instruccion.TamA==1){ //OPERANDO A ES REGISTRO
-        if (secA==0){ 
-            MV->R[codregA]=auxB;
-        }
-        else if (secA==3){ // AX 
-            MV->R[codregA]=MV->R[codregA]& 0xFFFF0000; 
-            MV->R[codregA]=MV->R[codregA] & (auxB & 0x0000FFFF); 
-        }
-        else if(secA==2){ // AH 
-            MV->R[codregA]=MV->R[codregA]& 0xFFFF00FF; 
-            auxB=auxB & 0xFF;
-            MV->R[codregA]=MV->R[codregA] & (auxB<<8);
-            
-        }
-        else{ // secA==1 (AL)
-            MV->R[codregA]=MV->R[codregA] & 0xFFFFFF00;
-            MV->R[codregA]=MV->R[codregA] & (auxB & 0x000000FF);
-        }
-    }
-    else{ //OPERANDO A ES MEMORIA
-        EscriboEnMemoria(MV,instruccion.OpA,auxB);
-    }
-
-    
-    //Hago "el MOV OpB,AuxA"
-    if(instruccion.TamB==1){ //OPERANDO B ES REGISTRO
-        if (secB==0){ 
-            MV->R[codregB]=auxA;
-        }
-        else if (secB==3){
-            MV->R[codregB]=MV->R[codregB]& 0xFFFF0000;
-            MV->R[codregB]=MV->R[codregB] & (auxA & 0x0000FFFF);
-        }
-        else if(secB==2){
-            MV->R[codregB]=MV->R[codregB]& 0xFFFF00FF;
-            auxA=auxA & 0xFF;
-            MV->R[codregB]=MV->R[codregB] & (auxA<<8);
-        }
-        else{ // secB==1 (AL)
-            MV->R[codregB]=MV->R[codregB] & 0xFFFFFF00;
-            MV->R[codregB]=MV->R[codregB] & (auxA & 0x000000FF);
-        }
-    }
-    else{ //OPERANDO B ES MEMORIA
-        EscriboEnMemoria(MV,instruccion.OpB,auxA);
-    }
-}
 
 // -------------------------------------- FUNCIONES CON 1 OPERANDO
 void JMP (TMV *MV,TInstruc instruccion){
@@ -1112,7 +1114,7 @@ void JMP (TMV *MV,TInstruc instruccion){
     // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
     if (sobrepasaCS(*MV,asignable)==1)
         generaerror(2);
-    
+
     MV->R[IP]=asignable;
 
 }
@@ -1133,11 +1135,11 @@ void JZ (TMV *MV,TInstruc instruccion){
         }else if (instruccion.TamA==3){ // Operando de memoria
             asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
-    
+
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(2);
-        
+
         MV->R[IP]=asignable;
     }
 }
@@ -1157,11 +1159,11 @@ void JP (TMV *MV,TInstruc instruccion){
         }else if (instruccion.TamA==3){ // Operando de memoria
             asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
-    
+
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(2);
-        
+
         MV->R[IP]=asignable;
     }
 }
@@ -1181,11 +1183,11 @@ void JN (TMV *MV,TInstruc instruccion){
         }else if (instruccion.TamA==3){ // Operando de memoria
             asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
-    
+
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(2);
-        
+
         MV->R[IP]=asignable;
     }
 }
@@ -1193,7 +1195,7 @@ void JN (TMV *MV,TInstruc instruccion){
 void JNZ (TMV *MV,TInstruc instruccion){
     int asignable,auxCodReg,auxReg;
     unsigned char auxSecReg;
-    
+
     if(devuelveZ(MV)==0){
         if(instruccion.TamA==1){ // Operando de registro
             DefinoRegistro(&auxSecReg,&auxCodReg,instruccion.OpA);
@@ -1205,11 +1207,11 @@ void JNZ (TMV *MV,TInstruc instruccion){
         }else if (instruccion.TamA==3){ // Operando de memoria
             asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
-    
+
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(2);
-        
+
         MV->R[IP]=asignable;
     }
 }
@@ -1229,11 +1231,11 @@ void JNP (TMV *MV, TInstruc instruccion){
         }else if (instruccion.TamA==3){ // Operando de memoria
             asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
-    
+
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(2);
-        
+
         MV->R[IP]=asignable;
     }
 }
@@ -1253,11 +1255,11 @@ void JNN (TMV *MV, TInstruc instruccion){
         }else if (instruccion.TamA==3){ // Operando de memoria
             asignable=LeoEnMemoria(*MV,instruccion.OpA);
         }
-    
+
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(2);
-        
+
         MV->R[IP]=asignable;
     }
 }

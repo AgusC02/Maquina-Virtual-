@@ -10,7 +10,6 @@ int main(int argc, char *argv[]){
     char VecFunciones[CANTFUNC][5]; //5 Es la cantidad de caracteres que tiene como maximo el nombre de la funcion.
     char VecRegistros[CANTREG][4];
     char nomarch[50];
-    int error=0;
 
     // INICIO
     strcpy(nomarch,argv[1]);
@@ -24,7 +23,7 @@ int main(int argc, char *argv[]){
     //PARA DEBUGEAR
     muestravaloresmv(MV);
 
-    
+
 
 return 0;
 }
