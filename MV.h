@@ -52,15 +52,17 @@ void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]); //PARA DISASSEMBLER
 void inicializoVecRegistros(char VecRegistros[CANTREG][4]);  //PARA DISASSEMBLER
 void declaroFunciones(TFunc Funciones);
 void LeoArch(char nomarch[],TMV *MV);
-int direccionamiento_logtofis(TMV *MV, int reg);
+int direccionamiento_logtofis(TMV MV, int reg);
 void LeoInstruccion(TMV* MV);
 void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp);
 void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc);
-void DefinoRegistro(unsigned char *Sec , int *CodOp, int Op);
+void DefinoRegistro(unsigned char *Sec , unsigned char *CodOp, int Op);
 void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int Op);
-int LeoEnMemoria(TMV *MV,int Op);
+int LeoEnMemoria(TMV MV,int Op);
 int GuardoValorMemoria(TMV *MV,int Op);
 void EscriboEnMemoria(TMV *MV,int Op, int Valor);
+void modificoCC(TMV *MV,int Resultado);
+void guardoOpB(TMV MV, TInstruc instruc, int *auxOpB);
 
 //DEBUG
 void muestramemoria(unsigned char memoria[]);

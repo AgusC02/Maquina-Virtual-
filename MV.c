@@ -94,9 +94,9 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
 void declaroFunciones(TFunc Funciones){
 //2 OPERANDOS
   Funciones[16]=MOV;
-  /*Funciones[17]=ADD;
+  Funciones[17]=ADD;
   Funciones[18]=SUB;
-  Funciones[19]=SWAP;
+  /*Funciones[19]=SWAP;
   Funciones[20]=MUL;
   Funciones[21]=DIV;
   Funciones[22]=CMP;
@@ -156,13 +156,13 @@ void LeoArch(char nomarch[],TMV *MV){
   }
 
   //MODIFICADO
-int direccionamiento_logtofis(TMV *MV, int reg){
+int direccionamiento_logtofis(TMV MV, int reg){
     int DirBase,Offset,DirFisica,TamSeg,LimiteSup;
 
-    DirBase = ((MV->TDS[(MV->R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
-    Offset = MV->R[reg] & 0X0000FFFF;
+    DirBase = ((MV.TDS[(MV.R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
+    Offset = MV.R[reg] & 0X0000FFFF;
     DirFisica = DirBase + Offset;
-    TamSeg = ((MV->TDS[(MV->R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF);
+    TamSeg = ((MV.TDS[(MV.R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF);
     LimiteSup = DirBase + TamSeg;
 
     if (!( (DirBase >= DirFisica ) && (DirFisica + 4 <= LimiteSup  ) )){
@@ -176,7 +176,7 @@ int direccionamiento_logtofis(TMV *MV, int reg){
 int posmaxCODESEGMENT(TMV *MV){
     int finCS;
 
-    finCS=(MV->TDS[MV->R[CS]]>>16)+MV->TDS[MV->R[CS]]&0x0000FFFF;
+    finCS=(MV->TDS[MV->R[CS]]>>16) + (MV->TDS[MV->R[CS]]&0X0000FFFF);
     return finCS;
 }
 
@@ -259,36 +259,46 @@ void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc){
 
 }
 
-void DefinoRegistro(unsigned char *Sec , int *CodReg, int Op){  //Defino el sector del registro en el que operare y el tipo de registro
+void DefinoRegistro(unsigned char *Sec , unsigned char *CodOp, int Op){  //Defino el sector del registro en el que operare y el tipo de registro
   *Sec = (Op >> 2) & 0x03;
   *CodReg = (Op >> 4) & 0xF;
 }// Devuelve Sector y Codigo de Registro.
 
 void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago las posiciones del registro de 32 bytes en el que asignare a otro registro/memoria
-  if (Sec == 1)
+  int CorroSigno=0;
+  if (Sec == 1){
         *AuxR = MV.R[CodReg] & 0XFF;
+        CorroSigno = 24;
+    }
       else
-        if (Sec == 2)
+        if (Sec == 2){
           *AuxR = (MV.R[CodReg] & 0XFF00) >> 8;
+          CorroSigno = 16;
+        }
           else
-            if (Sec == 3)
+            if (Sec == 3){
               *AuxR = MV.R[CodReg] & 0XFFFF;
+              CorroSigno = 16;
+            }
             else
                 *AuxR = MV.R[CodReg];
+
+    *AuxR = *AuxR << CorroSigno;
+    *AuxR = *AuxR >> CorroSigno;
+
 }
 
-int LeoEnMemoria(TMV *MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
+int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
     int aux=0,PosReg;
 
     PosReg = direccionamiento_logtofis(MV,Op);
 
-    if (MV->Errores[2] != 1)
-      for (int i=0;i<4;i++){
-        aux+=MV->MEM[PosReg];
+    for (int i=0;i<4;i++){
+        aux+=MV.MEM[PosReg];
         PosReg++;
         if (4-i > 1)
             aux=aux << 8;
-      }
+    }
 
     return aux;
 }
@@ -299,48 +309,66 @@ void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes 
     
     int PosReg;
 
-    PosReg = direccionamiento_logtofis(MV,Op);
+    PosReg = direccionamiento_logtofis(*MV,Op);
 
-    if (MV->Errores[2] != 1)
-        for (int i=0;i<4;i++){
-            MV->MEM[PosReg] = (Valor & 0XFF000000) >> 24;
-            PosReg++;
-            if (4-i > 1)
-                Valor=Valor << 8;
-        }
+    for (int i=0;i<4;i++){
+        MV->MEM[PosReg] = (Valor & 0XFF000000) >> 24;
+        PosReg++;
+        if (4-i > 1)
+            Valor=Valor << 8;
+    }
+}
+
+void modificoCC(TMV *MV,int Resultado){
+  MV->R[8] = MV->R[8] & 0x00000000;
+    if (Resultado < 0)
+        MV->R[8] = 0x80000000;
+    else
+      if (Resultado == 0)
+         MV->R[8] = 0x40000000;
+}
+
+void guardoOpB(TMV MV, TInstruc instruc, int *auxOpB){
+    unsigned char SecB,CodOpB;
+
+    //OPB
+    if (instruc.TamB == 1){
+        DefinoRegistro(&SecB,&CodOpB,instruc.OpB);
+        DefinoAuxRegistro(auxOpB,MV,SecB,CodOpB);
+    }
+    else
+      if (instruc.TamB == 2){  //Inmediato
+         *auxOpB = instruc.OpB;
+         *auxOpB = *auxOpB << 16;
+         *auxOpB = *auxOpB >> 16;
+      }
+      else
+        if (instruc.TamB == 3)
+            *auxOpB = LeoEnMemoria(MV,instruc.OpB);
 
 }
 
 void MOV(TMV * MV,TInstruc instruc){
-    int mover=0,CodOpB;
-    unsigned char SecA,SecB;
+    int mover;
+    unsigned char SecA,CodOpA; //CodOp es unsigned char, no?
 
     //OPB
-    if (instruc.TamB == 1){ //Si Op2 es de registro, muevo el valor del puntero a memoria, por ejemplo 00 00 00 08
-        DefinoRegistro(&SecB,&CodOpB,instruc.OpB);
-        DefinoAuxRegistro(&mover,*MV,SecB,CodOpB);  //En mover (auxregistro) guardo el puntero a memoria que debo guardar, ya sea, el 3,4,34,o 1234 bytes.
-    }
-    else
-      if (instruc.TamB == 2)  //Inmediato
-         mover=instruc.OpB;
-      else
-        if (instruc.TamB == 3) //Memoria, debo sumar todos los valores dentro de la memoria y guardarlo en mover.
-            mover = LeoEnMemoria(MV,instruc.OpB);
+    guardoOpB(*MV,instruc,&mover);
 
     //OPA
     if (instruc.TamA == 1){ //Si Op1 es de registro, debo cambiar la posicion de memoria del registro por la que me diga el Op1
-        DefinoRegistro(&SecA,&CodOpB,instruc.OpA);
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
         if (SecA == 1) //4 byte
-            MV->R[instruc.OpA] = (MV->R[instruc.OpA] & 0XFFFFFF00) + (mover & 0XFF);
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + (mover & 0XFF);
         else
             if (SecA == 2){ //3 byte
-                MV->R[instruc.OpA] = (MV->R[instruc.OpA] & 0XFFFF00FF) + ( (mover & 0XFF) << 8);
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( (mover & 0XFF) << 8);
             }
             else
                 if (SecA == 3) //3 y 4 byte
-                    MV->R[instruc.OpA] = (MV->R[instruc.OpA] & 0XFFFF0000) + (mover & 0XFFFF);
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) + (mover & 0XFFFF);
                 else //Los 4 bytes
-                    MV->R[instruc.OpA] = (MV->R[instruc.OpA] & 0X0000000000000000) + mover;
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0X0000000000000000) + mover;
 
     }
      else{ //Es memoria ya que no se puede guardar nada en un inmediato
@@ -349,12 +377,411 @@ void MOV(TMV * MV,TInstruc instruc){
 
 }
 
+void ADD(TMV * MV,TInstruc instruc){
+    int sumar;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&sumar);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) + (sumar & 0XFF) ) & 0XFF );  // MODIFICAR
+        else
+            if (SecA == 2){
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) + ( (sumar & 0XFF) << 8) ) & 0x0000FF00);
+            }
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) + ( ( (MV->R[CodOpA] & 0x0000FFFF) +  (sumar & 0XFFFF) ) & 0x0000FFFF );
+                else
+                    MV->R[CodOpA] += sumar;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+      modificoCC(MV,ResultadoSeg); //ResultadoSeg guarda el resultado del segmento que fue modificado, con el fin de modificar condition code
+    }
+     else{
+        int AuxSuma;
+        AuxSuma = LeoEnMemoria(*MV,instruc.OpA) + sumar;
+        modificoCC(MV,AuxSuma);
+        EscriboEnMemoria(MV,instruc.OpA,AuxSuma);
+    }
 
 
+}
+
+void SUB(TMV * MV,TInstruc instruc){
+    int resta;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&resta);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) - (resta & 0XFF) ) & 0XFF );
+        else
+            if (SecA == 2)
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) - ( (resta & 0XFF) << 8) ) & 0x0000FF00);
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( ( (MV->R[CodOpA] & 0x0000FFFF) -  (resta & 0XFFFF) ) & 0x0000FFFF) ;
+                else
+                    MV->R[CodOpA] -= resta;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+      modificoCC(MV,ResultadoSeg);
+    }
+     else{
+        int AuxResta;
+        AuxResta = LeoEnMemoria(*MV,instruc.OpA) - resta;
+        modificoCC(MV,AuxResta);
+        EscriboEnMemoria(MV,instruc.OpA,AuxResta);
+    }
 
 
+}
+
+void MUL(TMV * MV,TInstruc instruc){
+    int mult;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&mult);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) * (mult & 0XFF) ) & 0XFF );
+        else
+            if (SecA == 2)
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) * ( (mult & 0XFF) << 8) ) & 0x0000FF00);
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( ( (MV->R[CodOpA] & 0x0000FFFF) * (mult & 0XFFFF) ) & 0x0000FFFF) ;
+                else
+                    MV->R[CodOpA] *= mult;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+      modificoCC(MV,ResultadoSeg);
+    }
+     else{
+        int AuxMult;
+        AuxMult = LeoEnMemoria(*MV,instruc.OpA) * mult;
+        modificoCC(MV,AuxMult);
+        EscriboEnMemoria(MV,instruc.OpA,AuxMult);
+    }
+}
+
+void DIV(TMV * MV,TInstruc instruc){
+    int divisor;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&divisor);
+
+    if (divisor == 0)
+        generaerror(1);
+    else{
+       //OPA
+       int Dividendo;
+       if (instruc.TamA == 1){ //Si Op1 es de registro, debo divido la posicion de memoria del registro actual con la que me diga el Op1
+          DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+          DefinoAuxRegistro(&Dividendo,*MV,SecA,CodOpA);
+          if (SecA == 1) //4 byte
+              MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) / (divisor & 0XFF) ) & 0XFF ); //Apago los bits que voy a modificar de OpA
+          else                                                                                         //Y lo divido con lo que da la suma de los bits que voy a modificar de OpA con los bits que corresponden al OpB.
+              if (SecA == 2){ //3 byte
+                  MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) / ( (divisor & 0XFF) << 8) ) & 0x0000FF00);
+              }
+              else
+                  if (SecA == 3) //3 y 4 byte
+                      MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( ( (MV->R[CodOpA] & 0x0000FFFF) /  (divisor & 0XFFFF) ) & 0x0000FFFF);
+                  else //Los 4 bytes
+                      MV->R[CodOpA] /= divisor;
+
+        int ResultadoSeg;
+        DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+        modificoCC(MV,ResultadoSeg);
+        MV->R[9] = ( Dividendo % divisor);
+      }
+       else{ //Es memoria ya que no se puede guardar nada en un inmediato
+          int AuxDiv, dividendo = LeoEnMemoria(*MV,instruc.OpA);
+          AuxDiv = (int) (dividendo / divisor);
+          modificoCC(MV,AuxDiv);
+          MV->R[9] = dividendo % divisor;
+          EscriboEnMemoria(MV,instruc.OpA,AuxDiv);
+        }
+    }
+}
+
+void CMP(TMV * MV,TInstruc instruc){
+    int resta,resultado;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&resta);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            resultado = ( ( (MV->R[CodOpA] & 0x000000FF) - (resta & 0XFF) ) & 0XFF );
+        else
+            if (SecA == 2)
+                resultado = ( ( (MV->R[CodOpA] & 0x0000FF00) - ( (resta & 0XFF) << 8) ) & 0x0000FF00) >> 8;
+            else
+                if (SecA == 3)
+                    resultado = ( ( (MV->R[CodOpA] & 0x0000FFFF) -  (resta & 0XFFFF) ) & 0x0000FFFF) ;
+                else
+                    resultado = MV->R[CodOpA] - resta;
+
+    }
+     else //Memoria
+        resultado = LeoEnMemoria(*MV,instruc.OpA) - resta;
 
 
+    modificoCC(MV,resultado);
+}
+
+void SHL(TMV * MV,TInstruc instruc){
+    int auxSHL;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&auxSHL);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) << (auxSHL & 0XFF) ) & 0XFF );
+        else
+            if (SecA == 2)
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) << ( (auxSHL & 0XFF) << 8) ) & 0x0000FF00);
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( ( (MV->R[CodOpA] & 0x0000FFFF) << (auxSHL & 0XFFFF) ) & 0x0000FFFF) ;
+                else
+                    MV->R[CodOpA] <<= auxSHL;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+      modificoCC(MV,ResultadoSeg);
+    }
+     else{
+        int AuxResSHL;
+        AuxResSHL = LeoEnMemoria(*MV,instruc.OpA) << auxSHL;
+        modificoCC(MV,AuxResSHL);
+        EscriboEnMemoria(MV,instruc.OpA,AuxResSHL);
+    }
+}
+
+void SHR(TMV * MV,TInstruc instruc){
+    int auxSHR;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&auxSHR);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) >> (auxSHR & 0XFF) ) & 0XFF );
+        else
+            if (SecA == 2)
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) >> ( (auxSHR & 0XFF) << 8) ) & 0x0000FF00);
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( ( (MV->R[CodOpA] & 0x0000FFFF) >> (auxSHR& 0XFFFF) ) & 0x0000FFFF) ;
+                else
+                    MV->R[CodOpA] >>= auxSHR;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+      modificoCC(MV,ResultadoSeg);
+    }
+     else{
+        int AuxResSHR;
+        AuxResSHR = LeoEnMemoria(*MV,instruc.OpA) >> auxSHR;
+        modificoCC(MV,AuxResSHR);
+        EscriboEnMemoria(MV,instruc.OpA,AuxResSHR);
+    }
+}
+
+void AND(TMV * MV,TInstruc instruc){
+    int auxAND;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&auxAND);
+
+    //OPA
+    if (instruc.TamA== 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) & (auxAND & 0XFF) ) & 0XFF );
+        else
+            if (SecA == 2)
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) & ( (auxAND & 0XFF) << 8) ) & 0x0000FF00);
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( ( (MV->R[CodOpA] & 0x0000FFFF) & (auxAND & 0XFFFF) ) & 0x0000FFFF) ;
+                else
+                    MV->R[CodOpA] &= auxAND;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+      modificoCC(MV,ResultadoSeg);
+    }
+     else{
+        int AuxResAnd;
+        AuxResAnd = LeoEnMemoria(*MV,instruc.OpA) & auxAND;
+        modificoCC(MV,AuxResAnd);
+        EscriboEnMemoria(MV,instruc.OpA,AuxResAnd);
+    }
+}
+
+void OR(TMV * MV,TInstruc instruc){
+    int auxOR;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&auxOR);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) | (auxOR & 0XFF) ) & 0XFF );
+        else
+            if (SecA == 2)
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) | ( (auxOR & 0XFF) << 8) ) & 0x0000FF00);
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( ( (MV->R[CodOpA] & 0x0000FFFF) | (auxOR & 0XFFFF) ) & 0x0000FFFF) ;
+                else
+                    MV->R[CodOpA] |= auxOR;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+      modificoCC(MV,ResultadoSeg);
+    }
+     else{
+        int AuxResOR;
+        AuxResOR = LeoEnMemoria(*MV,instruc.OpA) | auxOR;
+        modificoCC(MV,AuxResOR);
+        EscriboEnMemoria(MV,instruc.OpA,AuxResOR);
+    }
+}
+
+void XOR(TMV * MV,TInstruc instruc){
+    int auxXOR;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&auxXOR);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( ( (MV->R[CodOpA] & 0x000000FF) ^ (auxXOR & 0XFF) ) & 0XFF );
+        else
+            if (SecA == 2)
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( ( (MV->R[CodOpA] & 0x0000FF00) ^ ( (auxXOR & 0XFF) << 8) ) & 0x0000FF00);
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( ( (MV->R[CodOpA] & 0x0000FFFF) ^ (auxXOR & 0XFFFF) ) & 0x0000FFFF) ;
+                else
+                    MV->R[CodOpA] ^= auxXOR;
+
+      int ResultadoSeg;
+      DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
+      modificoCC(MV,ResultadoSeg);
+    }
+     else{
+        int AuxResXOR;
+        AuxResXOR = LeoEnMemoria(*MV,instruc.OpA) & auxXOR;
+        modificoCC(MV,AuxResXOR);
+        EscriboEnMemoria(MV,instruc.OpA,AuxResXOR);
+    }
+}
+
+void LDL(TMV * MV,TInstruc instruc){
+    int auxLDL;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&auxLDL);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) + (auxLDL & 0X0000FFFF) ;
+    }
+     else{
+        int AuxResLDL;
+        AuxResLDL = (LeoEnMemoria(*MV,instruc.OpA) & 0XFFFF0000 )+ (auxLDL & 0X0000FFFF);
+        EscriboEnMemoria(MV,instruc.OpA,AuxResLDL);
+     }
+}
+
+void LDH(TMV * MV,TInstruc instruc){
+    int auxLDH;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&auxLDH);
+
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        MV->R[CodOpA] = (MV->R[CodOpA] & 0X0000FFFF) + ((auxLDH & 0X0000FFFF) << 16);
+    }
+     else{
+        int AuxResLDH;
+        AuxResLDH = (LeoEnMemoria(*MV,instruc.OpA) & 0X0000FFFF )+ ((auxLDH & 0X0000FFFF) << 16);
+        EscriboEnMemoria(MV,instruc.OpA,AuxResLDH);
+     }
+}
+
+void RND(TMV * MV,TInstruc instruc){
+    int tope,random;
+    unsigned char SecA,CodOpA;
+
+    //OPB
+    guardoOpB(*MV,instruc,&tope);
+    random = rand() % (tope + 1);
+
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        if (SecA == 1)
+            MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + ( random  & 0XFF );
+        else
+            if (SecA == 2)
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + (( (random & 0XFF) << 8)  & 0x0000FF00);
+            else
+                if (SecA == 3)
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) +  ( random & 0x0000FFFF) ;
+                else
+                    MV->R[CodOpA] = random;
+
+
+    }
+     else //Es memoria ya que no se puede guardar nada en un inmediato
+        EscriboEnMemoria(MV,instruc.OpA,random);
+
+}
 //---------------------------------------------------------------DEBUG-------------------------------------------------------------------
 void muestramemoria(unsigned char memoria[]){
     int pos_i,pos_f;
