@@ -1016,7 +1016,7 @@ void SWAP(TMV *MV,TInstruc instruccion){
 
     int auxA=0,auxB=0,codregA,codregB,regA,regB;
     unsigned char secA=0,secB=0;
-
+ 
     //Saco primer operando a un auxiliar.
     if(instruccion.TamA==1){ //Si el operando A es registro.
         DefinoRegistro(&secA,&codregA,auxA);
@@ -1044,13 +1044,15 @@ void SWAP(TMV *MV,TInstruc instruccion){
         if (secA==0){ 
             MV->R[codregA]=auxB;
         }
-        else if (secA==3){
-            MV->R[codregA]=MV->R[codregA]& 0xFFFF0000;
-            MV->R[codregA]=MV->R[codregA] & (auxB & 0x0000FFFF);
+        else if (secA==3){ // AX 
+            MV->R[codregA]=MV->R[codregA]& 0xFFFF0000; 
+            MV->R[codregA]=MV->R[codregA] & (auxB & 0x0000FFFF); 
         }
-        else if(secA==2){
-            MV->R[codregA]=MV->R[codregA]& 0xFFFF00FF;
-            MV->R[codregA]=MV->R[codregA] & (auxB<<8); // Checkear esto, parece raro y capaz con algun char se arreglaria. PUEDE ESTAR BIEN.
+        else if(secA==2){ // AH 
+            MV->R[codregA]=MV->R[codregA]& 0xFFFF00FF; 
+            auxB=auxB & 0xFF;
+            MV->R[codregA]=MV->R[codregA] & (auxB<<8);
+            
         }
         else{ // secA==1 (AL)
             MV->R[codregA]=MV->R[codregA] & 0xFFFFFF00;
@@ -1073,7 +1075,8 @@ void SWAP(TMV *MV,TInstruc instruccion){
         }
         else if(secB==2){
             MV->R[codregB]=MV->R[codregB]& 0xFFFF00FF;
-            MV->R[codregB]=MV->R[codregB] & (auxA<<8); // Checkear esto, parece raro y capaz con algun char se arreglaria. PUEDE ESTAR BIEN.
+            auxA=auxA & 0xFF;
+            MV->R[codregB]=MV->R[codregB] & (auxA<<8);
         }
         else{ // secB==1 (AL)
             MV->R[codregB]=MV->R[codregB] & 0xFFFFFF00;
