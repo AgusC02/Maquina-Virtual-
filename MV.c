@@ -173,10 +173,10 @@ int direccionamiento_logtofis(TMV MV, int reg){
         return DirBase+Offset;
 }
 
-int posmaxCODESEGMENT(TMV *MV){
+int posmaxCODESEGMENT(TMV MV){
     int finCS;
 
-    finCS=(MV->TDS[MV->R[CS]]>>16) + (MV->TDS[MV->R[CS]]&0X0000FFFF);
+    finCS=(MV.TDS[MV.R[CS]]>>16) + (MV.TDS[MV.R[CS]]&0X0000FFFF);
     return finCS;
 }
 
@@ -193,7 +193,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
     declaroFunciones(Funciones);
 
-    finCS=posmaxCODESEGMENT(MV);
+    finCS=posmaxCODESEGMENT(*MV);
 
     while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
@@ -513,13 +513,13 @@ void DIV(TMV * MV,TInstruc instruc){
         int ResultadoSeg;
         DefinoAuxRegistro(&ResultadoSeg,*MV,SecA,CodOpA);
         modificoCC(MV,ResultadoSeg);
-        MV->R[9] = ( Dividendo % divisor);
+        MV->R[AC] = ( Dividendo % divisor);
       }
        else{ //Es memoria ya que no se puede guardar nada en un inmediato
           int AuxDiv, dividendo = LeoEnMemoria(*MV,instruc.OpA);
           AuxDiv = (int) (dividendo / divisor);
           modificoCC(MV,AuxDiv);
-          MV->R[9] = dividendo % divisor;
+          MV->R[AC] = dividendo % divisor;
           EscriboEnMemoria(MV,instruc.OpA,AuxDiv);
         }
     }
@@ -837,7 +837,8 @@ char obtienetipooperacion(unsigned char operacion){
 }
 
 char sobrepasaCS(TMV MV,int asignable){
-    if(asignable>MV.TDS[CS]&0x0000FFFF)
+    
+    if(asignable>=posmaxCODESEGMENT(MV))
         return 1;
     else
         return 0;
@@ -1115,6 +1116,7 @@ void JMP (TMV *MV,TInstruc instruccion){
     MV->R[IP]=asignable;
 
 }
+
 
 void JZ (TMV *MV,TInstruc instruccion){
     int asignable,auxCodReg,auxReg;
