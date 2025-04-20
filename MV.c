@@ -189,18 +189,20 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
     int CantOp,CodOp;
     TInstruc instruc;
     TFunc Funciones;
+    int DirFisicaActual;
 
     declaroFunciones(Funciones);
 
-    int DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
     finCS=posmaxCODESEGMENT(MV);
 
     while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
-        ComponentesInstruccion(direccionamiento_logtofis(*MV,MV->R[IP]),&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
+        DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
+        ComponentesInstruccion(DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
+        
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
 
             if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
-               SeteoValorOp(MV, direccionamiento_logtofis(*MV,MV->R[IP]), &instruc); // Distingue entre uno o dos operandos a setear
+               SeteoValorOp(MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
            // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
            
            //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS. 
