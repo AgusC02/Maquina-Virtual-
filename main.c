@@ -19,10 +19,12 @@ int main(int argc, char *argv[]){
     //declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
-    LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
-
+    //LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
+    muestravaloresmv(MV);
+    LeoInstruccion(&MV);
     //PARA DEBUGEAR
-    //muestravaloresmv(MV);
+    muestravaloresmv(MV);
+
 
 
 

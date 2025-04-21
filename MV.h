@@ -59,7 +59,7 @@ void LeoArch(char nomarch[],TMV *MV);
 int posmaxCODESEGMENT(TMV MV);
 int direccionamiento_logtofis(TMV MV, int puntero);
 void LeoInstruccion(TMV* MV);
-void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp);
+void ComponentesInstruccion(TMV MV,int DirFisica,TInstruc *instruc, int *CantOp, unsigned char *CodOp);
 void SeteoValorOp(TMV MV,int DirFisicaActual,TInstruc *instruc);
 void DefinoRegistro(unsigned char *Sec , unsigned char *CodOp, int Op);
 void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int Op);

@@ -110,7 +110,7 @@ void declaroFunciones(TFunc Funciones){
   Funciones[30]=RND;
 
 //1 OPERANDO
-  //Funciones[0]=SYS;
+  Funciones[0]=SYS;
   Funciones[1]=JMP;
   Funciones[2]=JZ;
   Funciones[3]=JP;
@@ -118,10 +118,10 @@ void declaroFunciones(TFunc Funciones){
   Funciones[5]=JNZ;
   Funciones[6]=JNP;
   Funciones[7]=JNN;
-  //Funciones[8]=NOT;
+  Funciones[8]=NOT;
 
 //0 OPERANDOS
-  //Funciones[15]=STOP;
+  Funciones[15]=STOP;
 }
 
 void LeoArch(char nomarch[],TMV *MV){
@@ -163,13 +163,18 @@ void LeoArch(char nomarch[],TMV *MV){
 int direccionamiento_logtofis(TMV MV, int puntero){
     int DirBase,Offset,DirFisica,TamSeg,LimiteSup;
 
-    DirBase = ((MV.TDS[(MV.R[puntero] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
-    Offset = MV.R[puntero] & 0X0000FFFF;
+    //printf("PUNTERO: %08X \n",puntero);
+    DirBase = ((MV.TDS[(puntero & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
+    //printf("DirBase: %d \n",DirBase);
+    Offset = puntero & 0X0000FFFF;
+    //printf("Offset: %d \n",Offset);
     DirFisica = DirBase + Offset;
-    TamSeg = ((MV.TDS[(MV.R[puntero] & 0XFFFF0000) >> 16] ) & 0XFFFF);
+    //printf("DirFisica: %d \n",DirFisica);
+    TamSeg = ((MV.TDS[(puntero & 0XFFFF0000) >> 16] ) & 0XFFFF);
     LimiteSup = DirBase + TamSeg;
 
-    if (!( (DirBase >= DirFisica ) && (DirFisica + 4 <= LimiteSup  ) )){
+
+    if (!( (DirBase <= DirFisica ) && (DirFisica <= LimiteSup  ) )){
         generaerror(2);
         return -1;        // Aca nunca va a llegar si llama a generaerror, porque la ultima instruccion de la funcion es abort().
     }
@@ -180,7 +185,7 @@ int direccionamiento_logtofis(TMV MV, int puntero){
 int posmaxCODESEGMENT(TMV MV){
     int finCS;
 
-    finCS=(MV.TDS[MV.R[CS]]>>16) + (MV.TDS[MV.R[CS]]&0X0000FFFF);
+    finCS=(MV.TDS[MV.R[CS] >> 16]) + (MV.TDS[MV.R[CS]]&0X0000FFFF);
     return finCS;
 }
 
@@ -189,7 +194,8 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
  // Leo instruccion recibe la mv seteada y se encarga de leer y depurar todas las instrucciones - pasar del main al leo instrucción
   //Vector de funciones como variable local.
     int finCS;
-    int CantOp,CodOp;
+    int CantOp;
+    unsigned char CodOp;
     TInstruc instruc;
     TFunc Funciones;
     int DirFisicaActual;
@@ -197,13 +203,14 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
     declaroFunciones(Funciones);
 
     finCS=posmaxCODESEGMENT(*MV);
-
-    while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
+    //printf("FINCS: %x \n");
+    while(MV->R[IP]<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
-        ComponentesInstruccion(DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
-
+        //printf("dir actual:%d \n",DirFisicaActual);
+        ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
+        //printf("CodOp:%x \n",CodOp);
+        //printf("CantOp: %d",CantOp);
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
-
             if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
                SeteoValorOp(*MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
            // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
@@ -211,18 +218,19 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
            //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS.
             MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
-
+            printf("IP: %x \n",MV->R[IP]);
         }else
             generaerror(1);
     }
 }
 
-void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp){
+void ComponentesInstruccion(TMV MV,int DirFisica,TInstruc *instruc, int *CantOp, unsigned char *CodOp){
   //A priori no se cual es el opA y opB, suponemos que son 2 operandos, mas abajo, verifico.
-
+  unsigned char Instruccion = MV.MEM[DirFisica];
   instruc->TamB = (Instruccion & 0x000000C0) >> 6;
   instruc->TamA = (Instruccion & 0x00000030) >> 4;
   *CodOp = Instruccion & 0x1F;
+  //printf("Instruccion: %x \n",Instruccion);
   *CantOp=2;
 
   //Si no pasa por ningun if significa que tiene dos operandos.
@@ -354,7 +362,6 @@ void modificoCC(TMV *MV,int Resultado){
 
 void guardoOpB(TMV MV, TInstruc instruc, int *auxOpB){
     unsigned char SecB,CodOpB;
-
     //OPB
     if (instruc.TamB == 1){
         DefinoRegistro(&SecB,&CodOpB,instruc.OpB);
@@ -375,7 +382,6 @@ void guardoOpB(TMV MV, TInstruc instruc, int *auxOpB){
 void MOV(TMV * MV,TInstruc instruc){
     int mover;
     unsigned char SecA,CodOpA; //CodOp es unsigned char, no?
-
     //OPB
     guardoOpB(*MV,instruc,&mover);
 
@@ -391,8 +397,9 @@ void MOV(TMV * MV,TInstruc instruc){
             else
                 if (SecA == 3) //3 y 4 byte
                     MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) + (mover & 0XFFFF);
-                else //Los 4 bytes
+                else{ //Los 4 bytes
                     MV->R[CodOpA] = (MV->R[CodOpA] & 0X0000000000000000) + mover;
+                }
 
     }
      else{ //Es memoria ya que no se puede guardar nada en un inmediato
@@ -1057,7 +1064,7 @@ void SYS (TMV *MV, TInstruc instruccion){
 
 
 */
-
+    printf("entro al sys \n");
     int i,operando,pos_inicial_memoria,numero;
     char modo,celdas,size;
     char *bin;
@@ -1080,7 +1087,6 @@ void SYS (TMV *MV, TInstruc instruccion){
     *   Sino puedo hacerlo manualmente
     *
     */
-
     if(operando==1){    //READ
         for(i=0;i<celdas;i++){
             printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
@@ -1394,7 +1400,7 @@ void NOT (TMV *MV, TInstruc instruccion){
             (*MV).R[auxCodReg]=(*MV).R[auxCodReg] & (resultado<<8);
             //Propagacion de signo para mandarlo a modificoCC
             resultado=resultado<<32; // Esto tiene en cuenta que DefinoAuxRegistro no me lo devuelve colocado en AH sino en AL lo que habia en AH.
-            resultado=resultado<<32;
+            resultado=resultado>>32;
         }
     }
     else if (instruccion.TamA==3){ //Operando de memoria
@@ -1423,7 +1429,7 @@ void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char Vec
 
         PosInicial=PosMemoria;
         Instruccion = MV.MEM[PosMemoria];
-        ComponentesInstruccion(Instruccion,&instruc,&CantOp,&CodOp);
+        ComponentesInstruccion(MV,Instruccion,&instruc,&CantOp,&CodOp);
 
         SeteoValorOp(MV,PosMemoria,&instruc);
 
@@ -1465,8 +1471,8 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
 
     if (instruc.TamA != 0) {
         if (instruc.TamA == 3) { //Memoria
-            CodReg = (instruc.OpA >> 16) & 0xF;
-            Offset = instruc.OpA & 0xFFFF;
+            CodReg = (instruc.OpA >> 4) & 0xF;
+            Offset = (instruc.OpA >> 8) & 0xFFFF;
             if (CodReg !=0)
               if (CodReg>=10)
                   printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
@@ -1490,14 +1496,14 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
                   printf("%s",AuxSeg);
             }
             else
-               printf("%s",VecRegistros[instruc.OpA]);
+               printf("%s",VecRegistros[CodReg]);
         }
 
         if (instruc.TamB!=0) {
             printf(", ");
             if (instruc.TamB == 3) {  //Memoria
-                CodReg = (instruc.OpB >> 16)& 0xF;
-                Offset = instruc.OpB & 0xFFFF;
+                CodReg = (instruc.OpB >> 4) & 0xF;
+                Offset = (instruc.OpB >> 8) & 0xFFFF;
                 if (CodReg>=10)
                   printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
                 else
@@ -1509,8 +1515,8 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
                }
                 else { //Registro
                   DefinoRegistro(&SecB,&CodReg,instruc.OpB);
-                  if (instruc.OpB >= 10){
-                     strcpy(AuxSeg,VecRegistros[instruc.OpB]);
+                  if (CodReg >= 10){
+                     strcpy(AuxSeg,VecRegistros[CodReg]);
                      GuardoSector(AuxSeg,SecB);
                      if (SecB == 0)
                         printf("%c%s",'E',AuxSeg);
@@ -1518,7 +1524,7 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
                         printf("%s",AuxSeg);
                  }
                  else
-                    printf("%s",VecRegistros[instruc.OpB]);
+                    printf("%s",VecRegistros[CodReg]);
                 }
         }
     }
