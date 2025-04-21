@@ -126,7 +126,7 @@ void declaroFunciones(TFunc Funciones){
 
 void LeoArch(char nomarch[],TMV *MV){
   FILE *arch;
-  char leo;
+  unsigned char leo;
   //char t_primer_byte,t_segundo_byte; POR SI NO LEE DE UNA EL SHORT INT.
   theader header;
   int i=0;
@@ -140,9 +140,12 @@ void LeoArch(char nomarch[],TMV *MV){
   fread(&header.version,sizeof(char),1,arch);
   //fread(&header.tam,sizeof(short int),1,arch); //No anda por que lo lee al reves (lee little endian)
   fread(&leo,sizeof(char),1,arch);
-  header.tam=leo<<8;
+  header.tam=leo;
+  header.tam=header.tam<<8;
   fread(&leo,sizeof(char),1,arch);
   header.tam+=leo;
+
+  //printf("FLAG LEOARCH TAMCS: %X\n",header.tam);
 
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
     if (header.version == 1){
@@ -206,6 +209,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
     finCS=posmaxCODESEGMENT(*MV);
     //printf("FINCS: %x \n");
+    //muestravaloresmv(*MV);
     while(MV->R[IP]<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
         //printf("dir actual:%d \n",DirFisicaActual);
@@ -220,7 +224,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
            //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS.
             MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
-            printf("IP: %x \n",MV->R[IP]);
+            //printf("IP: %x \n",MV->R[IP]);
         }else
             generaerror(1);
     }
@@ -797,6 +801,8 @@ void XOR(TMV * MV,TInstruc instruc){
     int auxXOR;
     unsigned char SecA,CodOpA;
 
+    //printf("FLAG ENTRA XOR\n");
+
     //OPB
     guardoOpB(*MV,instruc,&auxXOR);
 
@@ -906,6 +912,20 @@ void muestramemoria(unsigned char memoria[]){
     }
 }
 
+void muestraDatasegment(TMV MV,unsigned char memoria[]){
+    int pos_i,ultposcs;
+    int pos_f;
+
+    ultposcs=posmaxCODESEGMENT(MV);
+    pos_i=ultposcs;
+    pos_f=pos_i+20;
+
+    while(pos_i<=pos_f){
+        printf("[%08X] = %02X \n",pos_i-ultposcs,memoria[pos_i]);
+        pos_i++;
+    }
+}
+
 void muestraregistros(int reg[]){
     int i;
     char VecRegistros[CANTREG][4];
@@ -930,6 +950,7 @@ void muestravaloresmv(TMV mv){
     muestratds(mv.TDS);
     muestraregistros(mv.R);
     muestramemoria(mv.MEM);
+    //muestraDatasegment(mv,mv.MEM);
 }
 
 char obtienetipooperacion(unsigned char operacion){
@@ -1064,13 +1085,14 @@ void SYS (TMV *MV, TInstruc instruccion){
     El modo de escritura depende de la configuracion almacenada en AL.
 
 */
-    printf("entro al sys \n");
-    int i,operando,pos_inicial_memoria,numero;
+    //printf("entro al sys \n");
+    int i,operando,pos_inicial_memoria,numero,pos_max_acceso;
     char modo,celdas,size;
     char *bin;
     unsigned char Sec,Codreg;
 
-    //guardoOpB(*MV,instruccion,&operando);
+    //muestravaloresmv(*MV);
+
     if(instruccion.TamA==1){
         DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
         DefinoAuxRegistro(&operando,*MV,Sec,Codreg);
@@ -1084,15 +1106,19 @@ void SYS (TMV *MV, TInstruc instruccion){
         operando=LeoEnMemoria(*MV,instruccion.OpA);
 
     //SETEO VALORES
-    printf("Instruccion: OpA = %08X TamA= %08X\n",instruccion.OpA,instruccion.TamA);
-    printf("OPERANDO EN SYS: %X\n",operando);
+    //printf("Instruccion: OpA = %08X TamA= %08X\n",instruccion.OpA,instruccion.TamA);
+    //printf("OPERANDO EN SYS: %X\n",operando);
 
     modo= MV->R[EAX]& 0xFF;
+    //printf("MODO: %d\n",modo);
     celdas= MV->R[ECX]& 0xFF;
+    //printf("Cantidad de celdas: %d\n",celdas);
     size= (MV->R[ECX]>>8)& 0xFF;
+    //printf("Tamanio celda: %d\n",size);
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
     //El 0xFF creo que esta de mas pero por las dudas.
-
+    pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size);
+    //printf("pos acceso maximo: %04X\n",pos_max_acceso-posmaxCODESEGMENT(*MV));
     /*  Aca tendria que checkear si hay error de segmento en todas las posiciones de memoria a las que voy a querer acceder?
     *   Si es asi puedo usar:
     *   -------------------
@@ -1144,7 +1170,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         }
     }
     else if (operando==2){ //WRITE.
-        for (i=0;i<posmaxCODESEGMENT(*MV);i++){
+        for (i=0;i<celdas;i++){
             printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
             // PASA LO MISMO CON EL WRITE. SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4 ESTA BIEN, SINO HAY QUE CORREGIR CON ALGUN FOR.
             if(size==1){
@@ -1168,7 +1194,7 @@ void SYS (TMV *MV, TInstruc instruccion){
                 numero |= (*MV).MEM[pos_inicial_memoria++];
                 numero=numero<<8;
                 numero |= (*MV).MEM[pos_inicial_memoria++];
-                numero |= numero<<8;
+                numero = numero<<8;
                 numero |= (*MV).MEM[pos_inicial_memoria++];
             }
             /*  IMPLEMENTADO CON UN FOR SERIA:

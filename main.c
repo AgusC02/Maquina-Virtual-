@@ -19,7 +19,7 @@ int main(int argc, char *argv[]){
     //declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
-    //LeoInstruccion(&MV);
+    LeoInstruccion(&MV);
     LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
 
     //PARA DEBUGEAR

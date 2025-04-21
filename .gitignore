@@ -3,5 +3,6 @@
 **/.vscode
 *.depend
 *.layout
-**/bin/
-**/obj/
+/bin/
+/obj/
+/obj/debug/
