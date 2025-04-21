@@ -1320,6 +1320,7 @@ void NOT (TMV *MV, TInstruc instruccion){
 void STOP(TMV *MV,TInstruc instruccion){
     exit (0);
 }
+
 void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
 
     unsigned char Instruccion;
