@@ -156,13 +156,13 @@ void LeoArch(char nomarch[],TMV *MV){
   }
 
   //MODIFICADO
-int direccionamiento_logtofis(TMV MV, int reg){
+int direccionamiento_logtofis(TMV MV, int puntero){
     int DirBase,Offset,DirFisica,TamSeg,LimiteSup;
 
-    DirBase = ((MV.TDS[(MV.R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
-    Offset = MV.R[reg] & 0X0000FFFF;
+    DirBase = ((MV.TDS[(MV.R[puntero] & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
+    Offset = MV.R[puntero] & 0X0000FFFF;
     DirFisica = DirBase + Offset;
-    TamSeg = ((MV.TDS[(MV.R[reg] & 0XFFFF0000) >> 16] ) & 0XFFFF);
+    TamSeg = ((MV.TDS[(MV.R[puntero] & 0XFFFF0000) >> 16] ) & 0XFFFF);
     LimiteSup = DirBase + TamSeg;
 
     if (!( (DirBase >= DirFisica ) && (DirFisica + 4 <= LimiteSup  ) )){
@@ -291,9 +291,23 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago l
 }
 
 int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
-    int aux=0,PosReg;
+    int aux=0,PosReg,offset,CodReg,puntero;
+/*  OPERANDO DE MEMORIA [5]
+    00 --> 
+          } OFFSET
+    05 -->
+    10 --> DS
+    EN 1 BYTE = OFFSET (16BIT) CodReg(4bit)
+    */
 
-    PosReg = direccionamiento_logtofis(MV,Op);
+    offset=Op>>8;
+    CodReg=(Op>>4)&0xF;
+    
+    puntero=(MV).R[CodReg]+offset;
+    
+
+
+    PosReg = direccionamiento_logtofis(MV,puntero);
 
     for (int i=0;i<4;i++){
         aux+=MV.MEM[PosReg];
