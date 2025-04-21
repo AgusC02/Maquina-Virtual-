@@ -174,7 +174,7 @@ int direccionamiento_logtofis(TMV MV, int puntero){
     LimiteSup = DirBase + TamSeg;
 
 
-    if (!( (DirBase <= DirFisica ) && (DirFisica <= LimiteSup  ) )){
+    if (!( (DirBase <= DirFisica ) && (DirFisica <= LimiteSup  ) )){ // FALTA EL +4 EN DIR FISICA SI ES MEMORIA
         generaerror(2);
         return -1;        // Aca nunca va a llegar si llama a generaerror, porque la ultima instruccion de la funcion es abort().
     }
@@ -183,9 +183,11 @@ int direccionamiento_logtofis(TMV MV, int puntero){
 }
 
 int posmaxCODESEGMENT(TMV MV){
-    int finCS;
+    int finCS,baseCS,tamCS;
 
-    finCS=(MV.TDS[MV.R[CS] >> 16]) + (MV.TDS[MV.R[CS]]&0X0000FFFF);
+    baseCS =((MV.TDS[MV.R[CS] >> 16]) & 0XFFFF0000) >> 16;
+    tamCS = (MV.TDS[MV.R[CS] >> 16]) & 0XFFFF;
+    finCS = baseCS + tamCS;
     return finCS;
 }
 
@@ -227,10 +229,10 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 void ComponentesInstruccion(TMV MV,int DirFisica,TInstruc *instruc, int *CantOp, unsigned char *CodOp){
   //A priori no se cual es el opA y opB, suponemos que son 2 operandos, mas abajo, verifico.
   unsigned char Instruccion = MV.MEM[DirFisica];
+  //printf("DirFisica: %d, Instruccion: %x ",DirFisica, Instruccion);
   instruc->TamB = (Instruccion & 0x000000C0) >> 6;
   instruc->TamA = (Instruccion & 0x00000030) >> 4;
   *CodOp = Instruccion & 0x1F;
-  //printf("Instruccion: %x \n",Instruccion);
   *CantOp=2;
 
   //Si no pasa por ningun if significa que tiene dos operandos.
@@ -247,7 +249,6 @@ void ComponentesInstruccion(TMV MV,int DirFisica,TInstruc *instruc, int *CantOp,
           *CantOp=1;
       }
   }
-
 }
 
 void SeteoValorOp(TMV MV,int DirFisicaActual,TInstruc *instruc){
@@ -1442,12 +1443,10 @@ void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char Vec
     while (PosMemoria < PosFinal) {
 
         PosInicial=PosMemoria;
-        Instruccion = MV.MEM[PosMemoria];
-        ComponentesInstruccion(MV,Instruccion,&instruc,&CantOp,&CodOp);
+        ComponentesInstruccion(MV,PosMemoria,&instruc,&CantOp,&CodOp);
         SeteoValorOp(MV,PosMemoria,&instruc);
 
         PosMemoria += instruc.TamA+instruc.TamB+1; // Posicion de la Siguiente instruccion
-
         EscriboDissasembler(MV,VecFunciones,VecRegistros,CodOp,instruc,PosInicial,PosMemoria);
     }
 }
