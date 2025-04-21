@@ -19,9 +19,10 @@ int main(int argc, char *argv[]){
     //declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
+    LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
 
     //PARA DEBUGEAR
-    muestravaloresmv(MV);
+    //muestravaloresmv(MV);
 
 
 
