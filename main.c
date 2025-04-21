@@ -19,8 +19,14 @@ int main(int argc, char *argv[]){
     //declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
+    if(argc>1){
+        if (!strcmp(argv[2],"-d")){
+            LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
+        }
+    }
     LeoInstruccion(&MV);
-    LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
+    
+
 
     //PARA DEBUGEAR
     //muestravaloresmv(MV);
