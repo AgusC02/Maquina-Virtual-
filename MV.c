@@ -1088,8 +1088,11 @@ void SYS (TMV *MV, TInstruc instruccion){
     printf("OPERANDO EN SYS: %X\n",operando);
 
     modo= MV->R[EAX]& 0xFF;
+    printf("MODO: %d\n",modo);
     celdas= MV->R[ECX]& 0xFF;
+    printf("Cantidad de celdas: %d\n",celdas);
     size= (MV->R[ECX]>>8)& 0xFF;
+    printf("Tamanio celda: %d\n",size);
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
     //El 0xFF creo que esta de mas pero por las dudas.
 
@@ -1144,7 +1147,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         }
     }
     else if (operando==2){ //WRITE.
-        for (i=0;i<posmaxCODESEGMENT(*MV);i++){
+        for (i=0;i<celdas;i++){
             printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
             // PASA LO MISMO CON EL WRITE. SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4 ESTA BIEN, SINO HAY QUE CORREGIR CON ALGUN FOR.
             if(size==1){
