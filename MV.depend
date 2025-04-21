@@ -1,13 +1,13 @@
 # depslib dependency file v1.0
-1745086953 source:c:\users\aagus\onedrive\escritorio\facu\facultad\arquitectura\mv_recursada\maquina-virtual-\main.c
+1745202253 source:c:\users\aagus\onedrive\escritorio\facu\facultad\arquitectura\mv_recursada\maquina-virtual-\main.c
 	<stdio.h>
 	<stdlib.h>
 	<string.h>
 	"MV.h"
 
-1745187934 c:\users\aagus\onedrive\escritorio\facu\facultad\arquitectura\mv_recursada\maquina-virtual-\mv.h
+1745202263 c:\users\aagus\onedrive\escritorio\facu\facultad\arquitectura\mv_recursada\maquina-virtual-\mv.h
 
-1745188314 source:c:\users\aagus\onedrive\escritorio\facu\facultad\arquitectura\mv_recursada\maquina-virtual-\mv.c
+1745198085 source:c:\users\aagus\onedrive\escritorio\facu\facultad\arquitectura\mv_recursada\maquina-virtual-\mv.c
 	<stdio.h>
 	<stdlib.h>
 	<string.h>

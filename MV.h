@@ -60,7 +60,7 @@ int posmaxCODESEGMENT(TMV MV);
 int direccionamiento_logtofis(TMV MV, int puntero);
 void LeoInstruccion(TMV* MV);
 void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp);
-void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc);
+void SeteoValorOp(TMV MV,int DirFisicaActual,TInstruc *instruc);
 void DefinoRegistro(unsigned char *Sec , unsigned char *CodOp, int Op);
 void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int Op);
 int LeoEnMemoria(TMV MV,int Op);
@@ -139,7 +139,7 @@ void NOT(TMV * MV,TInstruc instruc);
 void STOP(TMV * MV,TInstruc instruc);
 
 // DISSASSEMBLER
-void LeoInstruccionDissasembler(TMV *MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
+void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
 void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc,unsigned short int PosInicial,unsigned short int PosMemoria);
 void GuardoSector(char Segmento[4],unsigned char Sec);
 

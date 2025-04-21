@@ -96,7 +96,7 @@ void declaroFunciones(TFunc Funciones){
   Funciones[16]=MOV;
   Funciones[17]=ADD;
   Funciones[18]=SUB;
-  /*Funciones[19]=SWAP;
+  Funciones[19]=SWAP;
   Funciones[20]=MUL;
   Funciones[21]=DIV;
   Funciones[22]=CMP;
@@ -110,7 +110,7 @@ void declaroFunciones(TFunc Funciones){
   Funciones[30]=RND;
 
 //1 OPERANDO
-  Funciones[0]=SYS;
+  //Funciones[0]=SYS;
   Funciones[1]=JMP;
   Funciones[2]=JZ;
   Funciones[3]=JP;
@@ -118,15 +118,15 @@ void declaroFunciones(TFunc Funciones){
   Funciones[5]=JNZ;
   Funciones[6]=JNP;
   Funciones[7]=JNN;
-  Funciones[8]=NOT;
+  //Funciones[8]=NOT;
 
 //0 OPERANDOS
-  Funciones[15]=STOP;
-*/
+  //Funciones[15]=STOP;
 }
 
 void LeoArch(char nomarch[],TMV *MV){
   FILE *arch;
+  char leo;
   //char t_primer_byte,t_segundo_byte; POR SI NO LEE DE UNA EL SHORT INT.
   theader header;
   int i=0;
@@ -138,7 +138,11 @@ void LeoArch(char nomarch[],TMV *MV){
   fread(&header.c4,sizeof(char),1,arch);
   fread(&header.c5,sizeof(char),1,arch);
   fread(&header.version,sizeof(char),1,arch);
-  fread(&header.tam,sizeof(short int),1,arch);
+  //fread(&header.tam,sizeof(short int),1,arch); //No anda por que lo lee al reves (lee little endian)
+  fread(&leo,sizeof(char),1,arch);
+  header.tam=leo<<8;
+  fread(&leo,sizeof(char),1,arch);
+  header.tam+=leo;
 
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
     if (header.version == 1){
@@ -183,7 +187,6 @@ int posmaxCODESEGMENT(TMV MV){
 
 void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probablemente los tengo que juntar en un vector para modularizar.
  // Leo instruccion recibe la mv seteada y se encarga de leer y depurar todas las instrucciones - pasar del main al leo instrucción
-    unsigned char InstruccionActual; //La instruccion son 8 bits
   //Vector de funciones como variable local.
     int finCS;
     int CantOp,CodOp;
@@ -202,7 +205,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
 
             if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
-               SeteoValorOp(MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
+               SeteoValorOp(*MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
            // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
 
            //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS.
@@ -239,18 +242,18 @@ void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int 
 
 }
 
-void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc){
+void SeteoValorOp(TMV MV,int DirFisicaActual,TInstruc *instruc){
     instruc->OpA = 0;
     instruc->OpB = 0;
 
     for (int i=0;i<instruc->TamB;i++){
-        instruc->OpB+=MV->MEM[++DirFisicaActual];
+        instruc->OpB+=MV.MEM[++DirFisicaActual];
         if ((instruc->TamB-i) > 1)
             instruc->OpB = instruc->OpB << 8;
     }
 
     for (int i=0;i<instruc->TamA;i++){
-        instruc->OpA+=MV->MEM[++DirFisicaActual];
+        instruc->OpA+=MV.MEM[++DirFisicaActual];
         if ((instruc->TamA-i) > 1)
             instruc->OpA = instruc->OpA << 8;
     }
@@ -471,14 +474,13 @@ void SUB(TMV * MV,TInstruc instruc){
 
 void SWAP(TMV *MV,TInstruc instruccion){
     // Intercambia los valores de los dos operandos (ambos deben ser registros y/o celdas de memoria)
-    // IDEA: SACO EL PRIMER OPERANDO A UN AUXILIAR, PONGO LO DEL SEGUNDO OPERANDO EN EL PRIMERO, Y PONGO LO DEL AUXILIAR EN EL SEGUNDO OPERANDO.
-
-    int auxA=0,auxB=0,codregA,codregB,regA,regB;
-    unsigned char secA=0,secB=0;
+    // IDEA: SACO EL PRIMER OPERANDO A UN AUXILIAR, PONGO LO DEL SEGUNDO OPERANDO EN EL PRIMERO, Y PONGO LO DEL AUXILIAR EN EL SEGUNDO OPERANDO.a
+    int auxA=0,auxB=0,regA,regB;
+    unsigned char secA=0,secB=0,codregA,codregB;
 
     //Saco primer operando a un auxiliar.
     if(instruccion.TamA==1){ //Si el operando A es registro.
-        DefinoRegistro(&secA,&codregA,auxA);
+        DefinoRegistro(&secA,&codregA,instruccion.OpA);
         DefinoAuxRegistro(&regA,*MV,secA,codregA);
         auxA=regA;
     }
@@ -489,7 +491,7 @@ void SWAP(TMV *MV,TInstruc instruccion){
 
     //Saco segundo operando a un auxiliar.
     if(instruccion.TamB==1){
-        DefinoRegistro(&secB,&codregB,auxB);
+        DefinoRegistro(&secB,&codregB,instruccion.OpB);
         DefinoAuxRegistro(&regB,*MV,secB,codregB);
         auxB=regB;
     }
@@ -955,252 +957,6 @@ int devuelveZ(TMV *MV){
 }
 
 
-//----------------------------------------DISSASEMBLER----------------------------------------------------//
-
-/*
-void LeoInstruccionDissasembler(TMV *MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
-
-    unsigned char Instruccion,SecB;
-    int OpA,OpB,CodOp,CantOp,TamOpA,TamOpB,AuxOpA,AuxOpB,AuxRB;
-    unsigned short int PosMemoria=0,PosMemoriaAux = 0,PosInicial;
-
-
-    DefinoRegistro(&SecB,&OpB);
-    DefinoAuxRegistro(&AuxRB,*MV,SecB,OpB);
-
-    while (PosMemoria < (MV->TDS[0] & 0x0000FFFF)) {  //Mientras la posicion sea menor al tamaño del codigo
-
-        PosInicial=PosMemoria;
-        PosMemoriaAux=PosMemoria;
-        Instruccion = MV->M[PosMemoria];
-        LeoTipoInstruccion(Instruccion,&OpA,&OpB,&CodOp,&CantOp);
-
-        TamOpA = (~(OpA) & 0x03);
-        TamOpB = (~(OpB) & 0x03);
-
-        AuxOpA=0;
-        AuxOpB=0;
-
-        if (CantOp == 2) {                      //Guardo los operandos en auxiliares
-            for (int j = 0; j < TamOpB; j++) {
-                AuxOpB += MV->M[++PosMemoriaAux];
-                if (TamOpB-j > 1)
-                    AuxOpB = AuxOpB << 8;
-            }
-            for (int i = 0; i < TamOpA; i++) {
-                AuxOpA += MV->M[++PosMemoriaAux];
-                if (TamOpA-i > 1)
-                    AuxOpA = AuxOpA << 8;
-            }
-        }
-        else
-           if (CantOp == 1)
-             for (int i = 0; i < TamOpA; i++) {
-                AuxOpA += MV->M[++PosMemoriaAux];
-                if (TamOpA-i > 1)
-                    AuxOpA = AuxOpA << 8;
-             }
-
-
-        PosMemoria += TamOpA+TamOpB+1; // Posicion de la Siguiente instruccion
-
-        EscriboDissasembler(*MV ,VecFunciones,VecRegistros,CodOp,AuxOpA,AuxOpB,TamOpA,TamOpB,PosInicial,PosMemoria);
-    }
-}
-
-void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc ,unsigned short int PosInicial,unsigned short int PosMemoria){
-
-    short int Offset;
-    unsigned char CodReg,SecA,SecB;
-    int i;
-    char AuxSeg[4];
-
-    printf("[%04X] ",PosInicial); //Muestro posicion de la memoria indicada, hexadecimal de 4 partes , 4 nibbles
-
-    //Muestro los 8 bits del tipo de instruccion, luego los valores de los operandos
-
-    for (i=PosInicial;i<PosMemoria;i++){
-        printf("%02X ",MV.M[i]); //Lo guardo en hexadecimal en dos partes. Primero se lee OpBOpA y luego COdOp y luego los valores de los operandos
-    }
-
-    //Tabulaciones
-
-    if (TamA+TamB > 4)
-        printf("\t| ");
-    else
-        if (TamA+TamB > 1)
-          printf("\t\t| ");
-    else
-        printf("\t\t\t| ");
-
-    printf("%s \t",VecFunciones[CodOp]); //Muestro operacion
-
-
-    //Muestro ASM
-
-    if (TamA != 0) {
-        if (TamA == 3) { //Memoria
-            CodReg = (OpA >> 16) & 0xF;
-            Offset = OpA & 0xFFFF;
-            if (CodReg !=0)
-              if (CodReg>=10)
-                  printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
-                else
-                    printf("[%s+%d]",VecRegistros[CodReg],Offset);
-            else
-                printf("[%d]",Offset);
-        }
-        else
-          if (TamA == 2) { //inmediato
-             printf("%hd", OpA);
-        }
-        else { //Registro
-            DefinoRegistro(&SecA,&OpA);
-            if (OpA >= 10){
-                strcpy(AuxSeg,VecRegistros[OpA]);
-                GuardoSector(AuxSeg,SecA);
-                if (SecA == 0)
-                   printf("%c%s",'E',AuxSeg);
-                else
-                  printf("%s",AuxSeg);
-            }
-            else
-               printf("%s",VecRegistros[OpA]);
-        }
-
-        if (TamB!=0) {
-            printf(", ");
-            if (TamB == 3) {  //Memoria
-                CodReg = (OpB >> 16)& 0xF;
-                Offset = OpB & 0xFFFF;
-                if (CodReg>=10)
-                  printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
-                else
-                    printf("[%s+%d]",VecRegistros[CodReg],Offset);
-            }
-            else
-                if (TamB == 2) {  //Inmediato
-                  printf("%hd", OpB);
-               }
-                else { //Registro
-                  DefinoRegistro(&SecB,&OpB);
-                  if (OpB >= 10){
-                     strcpy(AuxSeg,VecRegistros[OpB]);
-                     GuardoSector(AuxSeg,SecB);
-                     if (SecB == 0)
-                        printf("%c%s",'E',AuxSeg);
-                     else
-                        printf("%s",AuxSeg);
-                 }
-                 else
-                    printf("%s",VecRegistros[OpB]);
-                }
-        }
-    }
-  printf("\n");
-}
-
-void GuardoSector(char Segmento[4],unsigned char Sec){
-  if (Sec == 1)
-        strcat(Segmento,"L");
-  else
-    if (Sec == 2)
-        strcat(Segmento,"H");
-    else
-        strcat(Segmento,"X");
-}
-*/
-
-
-int leer_binario_c2_32(void) {
-    /**
- * Lee por teclado de 1 a 32 d�gitos binarios,
- * los interpreta como un int en complemento a 2 de 32 bits
- * (con ceros impl�citos a la izquierda) y devuelve el valor.
- */
-    char buffer[BUF_SIZE];
-    size_t len;
-    unsigned int uvalue;
-    int          svalue;
-
-    while (1) {
-        if (!fgets(buffer, sizeof(buffer), stdin)) {
-            fprintf(stderr, "Error al leer la entrada.\n");
-            exit(EXIT_FAILURE);
-        }
-
-        // Quitar '\n' y medir longitud
-        buffer[strcspn(buffer, "\n")] = '\0';
-        len = strlen(buffer);
-
-        // Validar longitud 1�32
-        if (len == 0 || len > BITS_32) {
-            printf("Entrada inv�lida: ingresa entre 1 y %d d�gitos binarios.\n\n", BITS_32);
-            continue;
-        }
-
-        // Validar que todos sean '0' o '1'
-        int valido = 1;
-        for (size_t i = 0; i < len; i++) {
-            if (buffer[i] != '0' && buffer[i] != '1') {
-                valido = 0;
-                break;
-            }
-        }
-        if (!valido) {
-            printf("Formato inv�lido: solo d�gitos '0' o '1'.\n\n");
-            continue;
-        }
-
-        // Convertir a unsigned int (base 2)
-        uvalue = (unsigned int)strtoul(buffer, NULL, 2);
-
-        // Ajuste complemento a 2 (32 bits)
-        if (uvalue & (1U << (BITS_32 - 1))) {
-            svalue = (int)(uvalue - (1ULL << BITS_32));
-        } else {
-            svalue = (int)uvalue;
-        }
-
-        return svalue;
-    }
-}
-
-
-char *int_to_c2bin(int numero) {
-    /**
-    * Convierte un `int` (asumiendo 32 bits) a su representaci�n
-    * en complemento a 2 y devuelve un puntero a una cadena reci�n
-    * alocada que contiene dicha representaci�n sin ceros a la izquierda.
-    *
-    * Si el n�mero es 0, la cadena ser� "0".
-    * El llamador debe liberar el buffer con free().
-    */
-
-    char full[BITS_32 + 1];
-    unsigned int u = (unsigned int) numero;
-
-    // Generar la cadena completa de 32 bits
-    for (int i = BITS_32 - 1; i >= 0; --i) {
-        full[i] = (u & 1) ? '1' : '0';
-        u >>= 1;
-    }
-    full[BITS_32] = '\0';
-
-    // Encontrar el primer '1', o dejar el �ltimo '0' si es todo ceros
-    char *p = full;
-    while (*p == '0' && *(p + 1) != '\0') {
-        ++p;
-    }
-
-    // Copiar a un buffer de tama�o justo
-    size_t len = strlen(p);
-    char *trimmed = malloc(len + 1);
-    if (!trimmed) return NULL;
-    memcpy(trimmed, p, len + 1);
-    return trimmed;
-}
-
 // -------------------------------------- FUNCIONES CON 1 OPERANDO
 void SYS (TMV *MV, TInstruc instruccion){
 /*  Ejecuta la llamada al sistema indicada por el valor del operando.
@@ -1345,8 +1101,8 @@ void SYS (TMV *MV, TInstruc instruccion){
 
 void JMP (TMV *MV,TInstruc instruccion){
     //Efectua un salto incondicional a la celda del segmento de codigo indicada en el operando.
-    int asignable,auxCodReg,auxReg;
-    unsigned char auxSecReg;
+    int asignable,auxReg;
+    unsigned char auxSecReg,auxCodReg;
 
 
     if(instruccion.TamA==1){ // Operando de registro
@@ -1370,8 +1126,8 @@ void JMP (TMV *MV,TInstruc instruccion){
 
 
 void JZ (TMV *MV,TInstruc instruccion){
-    int asignable,auxCodReg,auxReg;
-    unsigned char auxSecReg;
+    int asignable,auxReg;
+    unsigned char auxSecReg,auxCodReg;
 
     if(devuelveZ(MV)==1){
         if(instruccion.TamA==1){ // Operando de registro
@@ -1394,8 +1150,8 @@ void JZ (TMV *MV,TInstruc instruccion){
 }
 
 void JP (TMV *MV,TInstruc instruccion){
-    int asignable,auxCodReg,auxReg;
-    unsigned char auxSecReg;
+    int asignable,auxReg;
+    unsigned char auxSecReg,auxCodReg;
 
     if((devuelveN(MV)==0) && (devuelveZ(MV)==0)){
         if(instruccion.TamA==1){ // Operando de registro
@@ -1418,8 +1174,8 @@ void JP (TMV *MV,TInstruc instruccion){
 }
 
 void JN (TMV *MV,TInstruc instruccion){
-    int asignable,auxCodReg,auxReg;
-    unsigned char auxSecReg;
+    int asignable,auxReg;
+    unsigned char auxSecReg,auxCodReg;
 
     if (devuelveN(MV)==1){
         if(instruccion.TamA==1){ // Operando de registro
@@ -1442,8 +1198,8 @@ void JN (TMV *MV,TInstruc instruccion){
 }
 
 void JNZ (TMV *MV,TInstruc instruccion){
-    int asignable,auxCodReg,auxReg;
-    unsigned char auxSecReg;
+    int asignable,auxReg;
+    unsigned char auxSecReg,auxCodReg;
 
     if(devuelveZ(MV)==0){
         if(instruccion.TamA==1){ // Operando de registro
@@ -1466,8 +1222,8 @@ void JNZ (TMV *MV,TInstruc instruccion){
 }
 
 void JNP (TMV *MV, TInstruc instruccion){
-    int asignable,auxCodReg,auxReg;
-    unsigned char auxSecReg;
+    int asignable,auxReg;
+    unsigned char auxSecReg,auxCodReg;
 
     if(devuelveN(MV)==1 || devuelveZ(MV)==1){
         if(instruccion.TamA==1){ // Operando de registro
@@ -1490,8 +1246,8 @@ void JNP (TMV *MV, TInstruc instruccion){
 }
 
 void JNN (TMV *MV, TInstruc instruccion){
-    int asignable,auxCodReg,auxReg;
-    unsigned char auxSecReg;
+    int asignable,auxReg;
+    unsigned char auxSecReg,auxCodReg;
 
     if(devuelveN(MV)==0){
         if(instruccion.TamA==1){ // Operando de registro
@@ -1563,4 +1319,127 @@ void NOT (TMV *MV, TInstruc instruccion){
 // -------------------------------------- FUNCIONES SIN OPERANDO
 void STOP(TMV *MV,TInstruc instruccion){
     exit (0);
+}
+void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
+
+    unsigned char Instruccion;
+    int CodOp,CantOp;
+    TInstruc instruc;
+    unsigned short int PosInicial,PosMemoria,PosFinal;
+
+    PosMemoria = direccionamiento_logtofis(MV,MV.R[CS]);
+    PosFinal = posmaxCODESEGMENT(MV);
+    while (PosMemoria < PosFinal) {
+
+        PosInicial=PosMemoria;
+        Instruccion = MV.MEM[PosMemoria];
+        ComponentesInstruccion(Instruccion,&instruc,&CantOp,&CodOp);
+
+        SeteoValorOp(MV,PosMemoria,&instruc);
+
+        PosMemoria += instruc.TamA+instruc.TamB+1; // Posicion de la Siguiente instruccion
+
+        EscriboDissasembler(MV,VecFunciones,VecRegistros,CodOp,instruc,PosInicial,PosMemoria);
+    }
+}
+
+void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc ,unsigned short int PosInicial,unsigned short int PosMemoria){
+
+    short int Offset;
+    unsigned char CodReg,SecA,SecB;
+    int i;
+    char AuxSeg[4];
+
+    printf("[%04X] ",PosInicial); //Muestro posicion de la memoria indicada, hexadecimal de 4 partes , 4 nibbles
+
+    //Muestro los 8 bits del tipo de instruccion, luego los valores de los operandos
+
+    for (i=PosInicial;i<PosMemoria;i++){
+        printf("%02X ",MV.MEM[i]); //Lo guardo en hexadecimal en dos partes. Primero se lee OpBOpA y luego COdOp y luego los valores de los operandos
+    }
+
+    //Tabulaciones
+
+    if (instruc.TamA+instruc.TamB > 4)
+        printf("\t| ");
+    else
+        if (instruc.TamA+instruc.TamB > 1)
+          printf("\t\t| ");
+    else
+        printf("\t\t\t| ");
+
+    printf("%s \t",VecFunciones[CodOp]); //Muestro operacion
+
+
+    //Muestro ASM
+
+    if (instruc.TamA != 0) {
+        if (instruc.TamA == 3) { //Memoria
+            CodReg = (instruc.OpA >> 16) & 0xF;
+            Offset = instruc.OpA & 0xFFFF;
+            if (CodReg !=0)
+              if (CodReg>=10)
+                  printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
+                else
+                    printf("[%s+%d]",VecRegistros[CodReg],Offset);
+            else
+                printf("[%d]",Offset);
+        }
+        else
+          if (instruc.TamA == 2) { //inmediato
+             printf("%hd", instruc.OpA);
+        }
+        else { //Registro
+            DefinoRegistro(&SecA,&CodReg,instruc.OpA);
+            if (instruc.OpA >= 10){
+                strcpy(AuxSeg,VecRegistros[CodReg]);
+                GuardoSector(AuxSeg,SecA);
+                if (SecA == 0)
+                   printf("%c%s",'E',AuxSeg);
+                else
+                  printf("%s",AuxSeg);
+            }
+            else
+               printf("%s",VecRegistros[instruc.OpA]);
+        }
+
+        if (instruc.TamB!=0) {
+            printf(", ");
+            if (instruc.TamB == 3) {  //Memoria
+                CodReg = (instruc.OpB >> 16)& 0xF;
+                Offset = instruc.OpB & 0xFFFF;
+                if (CodReg>=10)
+                  printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
+                else
+                    printf("[%s+%d]",VecRegistros[CodReg],Offset);
+            }
+            else
+                if (instruc.TamB == 2) {  //Inmediato
+                  printf("%hd", instruc.OpB);
+               }
+                else { //Registro
+                  DefinoRegistro(&SecB,&CodReg,instruc.OpB);
+                  if (instruc.OpB >= 10){
+                     strcpy(AuxSeg,VecRegistros[instruc.OpB]);
+                     GuardoSector(AuxSeg,SecB);
+                     if (SecB == 0)
+                        printf("%c%s",'E',AuxSeg);
+                     else
+                        printf("%s",AuxSeg);
+                 }
+                 else
+                    printf("%s",VecRegistros[instruc.OpB]);
+                }
+        }
+    }
+  printf("\n");
+}
+void GuardoSector(char Segmento[4],unsigned char Sec){
+  if (Sec == 1)
+        strcat(Segmento,"L");
+  else
+    if (Sec == 2)
+        strcat(Segmento,"H");
+    else
+        strcat(Segmento,"X");
 }
