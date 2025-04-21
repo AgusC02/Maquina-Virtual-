@@ -296,7 +296,7 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago l
 int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
     int aux=0,PosReg,offset,CodReg,puntero;
 /*  OPERANDO DE MEMORIA [5]
-    00 --> 
+    00 -->
           } OFFSET
     05 -->
     10 --> DS
@@ -305,9 +305,9 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
-    
+
     puntero=(MV).R[CodReg]+offset;
-    
+
 
 
     PosReg = direccionamiento_logtofis(MV,puntero);
@@ -330,7 +330,7 @@ void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes 
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
-    
+
     puntero=(*MV).R[CodReg]+offset;
 
     PosReg = direccionamiento_logtofis(*MV,puntero);
@@ -956,6 +956,95 @@ int devuelveZ(TMV *MV){
     return i;
 }
 
+int leer_binario_c2_32(void) {
+    /**
+ * Lee por teclado de 1 a 32 d�gitos binarios,
+ * los interpreta como un int en complemento a 2 de 32 bits
+ * (con ceros impl�citos a la izquierda) y devuelve el valor.
+ */
+    char buffer[BUF_SIZE];
+    size_t len;
+    unsigned int uvalue;
+    int          svalue;
+
+    while (1) {
+        if (!fgets(buffer, sizeof(buffer), stdin)) {
+            fprintf(stderr, "Error al leer la entrada.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Quitar '\n' y medir longitud
+        buffer[strcspn(buffer, "\n")] = '\0';
+        len = strlen(buffer);
+
+        // Validar longitud 1�32
+        if (len == 0 || len > BITS_32) {
+            printf("Entrada inv�lida: ingresa entre 1 y %d d�gitos binarios.\n\n", BITS_32);
+            continue;
+        }
+
+        // Validar que todos sean '0' o '1'
+        int valido = 1;
+        for (size_t i = 0; i < len; i++) {
+            if (buffer[i] != '0' && buffer[i] != '1') {
+                valido = 0;
+                break;
+            }
+        }
+        if (!valido) {
+            printf("Formato inv�lido: solo d�gitos '0' o '1'.\n\n");
+            continue;
+        }
+
+        // Convertir a unsigned int (base 2)
+        uvalue = (unsigned int)strtoul(buffer, NULL, 2);
+
+        // Ajuste complemento a 2 (32 bits)
+        if (uvalue & (1U << (BITS_32 - 1))) {
+            svalue = (int)(uvalue - (1ULL << BITS_32));
+        } else {
+            svalue = (int)uvalue;
+        }
+
+        return svalue;
+    }
+}
+
+
+char *int_to_c2bin(int numero) {
+    /**
+    * Convierte un `int` (asumiendo 32 bits) a su representaci�n
+    * en complemento a 2 y devuelve un puntero a una cadena reci�n
+    * alocada que contiene dicha representaci�n sin ceros a la izquierda.
+    *
+    * Si el n�mero es 0, la cadena ser� "0".
+    * El llamador debe liberar el buffer con free().
+    */
+
+    char full[BITS_32 + 1];
+    unsigned int u = (unsigned int) numero;
+
+    // Generar la cadena completa de 32 bits
+    for (int i = BITS_32 - 1; i >= 0; --i) {
+        full[i] = (u & 1) ? '1' : '0';
+        u >>= 1;
+    }
+    full[BITS_32] = '\0';
+
+    // Encontrar el primer '1', o dejar el �ltimo '0' si es todo ceros
+    char *p = full;
+    while (*p == '0' && *(p + 1) != '\0') {
+        ++p;
+    }
+
+    // Copiar a un buffer de tama�o justo
+    size_t len = strlen(p);
+    char *trimmed = malloc(len + 1);
+    if (!trimmed) return NULL;
+    memcpy(trimmed, p, len + 1);
+    return trimmed;
+}
+
 
 // -------------------------------------- FUNCIONES CON 1 OPERANDO
 void SYS (TMV *MV, TInstruc instruccion){
@@ -1074,7 +1163,7 @@ void SYS (TMV *MV, TInstruc instruccion){
                 //Funcion que toma el numero (entero de 32 bits) y lo transforma en un string con formato 0b numero
                 bin = int_to_c2bin(numero);
                 if(!bin){
-                    printf(stderr,"ERROR DE MEMORIA EN SYS WRITE BINARIO\n");
+                    printf("ERROR DE MEMORIA EN SYS WRITE BINARIO\n");
                     exit(0);
                 }
                 printf("0b%s ",bin);
@@ -1313,7 +1402,7 @@ void NOT (TMV *MV, TInstruc instruccion){
         resultado=~aux;
         EscriboEnMemoria(MV,instruccion.OpA,resultado);
     }
-    
+
     modificoCC(MV,resultado);
 }
 // -------------------------------------- FUNCIONES SIN OPERANDO
