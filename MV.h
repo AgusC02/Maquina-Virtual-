@@ -57,7 +57,7 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]);  //PARA DISASSEMBLER
 void declaroFunciones(TFunc Funciones);
 void LeoArch(char nomarch[],TMV *MV);
 int posmaxCODESEGMENT(TMV MV);
-int direccionamiento_logtofis(TMV MV, int reg);
+int direccionamiento_logtofis(TMV MV, int puntero);
 void LeoInstruccion(TMV* MV);
 void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp);
 void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc);
