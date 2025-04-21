@@ -1062,15 +1062,29 @@ void SYS (TMV *MV, TInstruc instruccion){
     SYS 2 (WRITE): muestra en pantalla los valores contenidos a partir de la posicion de memoria apuntada por EDX, recuperando CL celdas de tama�o CH.
     El modo de escritura depende de la configuracion almacenada en AL.
 
-
 */
     printf("entro al sys \n");
     int i,operando,pos_inicial_memoria,numero;
     char modo,celdas,size;
     char *bin;
+    unsigned char Sec,Codreg;
 
-    guardoOpB(*MV,instruccion,&operando);
+    //guardoOpB(*MV,instruccion,&operando);
+    if(instruccion.TamA==1){
+        DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
+        DefinoAuxRegistro(&operando,*MV,Sec,Codreg);
+    }
+    else if (instruccion.TamA==2){
+        operando = instruccion.OpA;
+        operando = operando << 16;
+        operando = operando  >> 16;
+    }
+    else
+        operando=LeoEnMemoria(*MV,instruccion.OpA);
+
     //SETEO VALORES
+    printf("Instruccion: OpA = %08X TamA= %08X\n",instruccion.OpA,instruccion.TamA);
+    printf("OPERANDO EN SYS: %X\n",operando);
 
     modo= MV->R[EAX]& 0xFF;
     celdas= MV->R[ECX]& 0xFF;
@@ -1382,8 +1396,8 @@ void NOT (TMV *MV, TInstruc instruccion){
             resultado=resultado & 0xFF;
             (*MV).R[auxCodReg]=(*MV).R[auxCodReg]&resultado;
             //propagacion de signo para mandarlo a modificaCC
-            resultado=resultado<<32;
-            resultado=resultado>>32;
+            resultado=resultado<<24;
+            resultado=resultado>>24;
         }
         else if(auxSec==3){
             (*MV).R[auxCodReg]=(*MV).R[auxCodReg]>>16;
@@ -1399,8 +1413,8 @@ void NOT (TMV *MV, TInstruc instruccion){
             resultado=resultado & 0x000000FF;
             (*MV).R[auxCodReg]=(*MV).R[auxCodReg] & (resultado<<8);
             //Propagacion de signo para mandarlo a modificoCC
-            resultado=resultado<<32; // Esto tiene en cuenta que DefinoAuxRegistro no me lo devuelve colocado en AH sino en AL lo que habia en AH.
-            resultado=resultado>>32;
+            resultado=resultado<<24; // Esto tiene en cuenta que DefinoAuxRegistro no me lo devuelve colocado en AH sino en AL lo que habia en AH.
+            resultado=resultado>>24;
         }
     }
     else if (instruccion.TamA==3){ //Operando de memoria
@@ -1418,8 +1432,8 @@ void STOP(TMV *MV,TInstruc instruccion){
 
 void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
 
-    unsigned char Instruccion;
-    int CodOp,CantOp;
+    unsigned char Instruccion,CodOp;
+    int CantOp;
     TInstruc instruc;
     unsigned short int PosInicial,PosMemoria,PosFinal;
 
@@ -1430,7 +1444,6 @@ void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char Vec
         PosInicial=PosMemoria;
         Instruccion = MV.MEM[PosMemoria];
         ComponentesInstruccion(MV,Instruccion,&instruc,&CantOp,&CodOp);
-
         SeteoValorOp(MV,PosMemoria,&instruc);
 
         PosMemoria += instruc.TamA+instruc.TamB+1; // Posicion de la Siguiente instruccion

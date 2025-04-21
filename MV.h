@@ -1,7 +1,7 @@
 #ifndef TMV_H_INCLUDED
 #define TMV_H_INCLUDED
 #define TMEM 16384
-#define CANTFUNC 30
+#define CANTFUNC 31
 #define CANTREG 16
 #define CANTERRORES 3
 #define TDDSSIZE 8
