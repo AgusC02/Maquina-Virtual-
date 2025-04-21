@@ -1495,7 +1495,51 @@ void JNN (TMV *MV, TInstruc instruccion){
 }
 
 void NOT (TMV *MV, TInstruc instruccion){
+// Efectua la negacion bit a bit del operando y afectan al registro CC.
+// El resultado se almacena en el primer operando.
+    int resultado,aux;
+    unsigned char auxSec,auxCodReg;
 
+    if(instruccion.TamA==1){ //Operando de registro
+        DefinoRegistro(&auxSec,&auxCodReg,instruccion.OpA);
+        DefinoAuxRegistro(&aux,*MV,auxSec,auxCodReg);
+        resultado=~aux;
+        if(auxSec==0)
+            (*MV).R[auxCodReg]=resultado;
+        else if (auxSec==1){
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]>>8;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]<<8;
+            resultado=resultado & 0xFF;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]&resultado;
+            //propagacion de signo para mandarlo a modificaCC
+            resultado=resultado<<32;
+            resultado=resultado>>32;
+        }
+        else if(auxSec==3){
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]>>16;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]<<16;
+            resultado=resultado&0xFFFF;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]&resultado;
+            //Propagacion de signo para mandarlo a modificaCC.
+            resultado=resultado<<16;
+            resultado=resultado>>16;
+        }
+        else if(auxSec==2){
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]&0xFFFF00FF;
+            resultado=resultado & 0x000000FF;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg] & (resultado<<8);
+            //Propagacion de signo para mandarlo a modificoCC
+            resultado=resultado<<32; // Esto tiene en cuenta que DefinoAuxRegistro no me lo devuelve colocado en AH sino en AL lo que habia en AH.
+            resultado=resultado<<32;
+        }
+    }
+    else if (instruccion.TamA==3){ //Operando de memoria
+        aux=LeoEnMemoria(*MV,instruccion.OpA);
+        resultado=~aux;
+        EscriboEnMemoria(MV,instruccion.OpA,resultado);
+    }
+    
+    modificoCC(MV,resultado);
 }
 // -------------------------------------- FUNCIONES SIN OPERANDO
 void STOP(TMV *MV,TInstruc instruccion){
