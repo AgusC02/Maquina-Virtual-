@@ -126,7 +126,7 @@ void declaroFunciones(TFunc Funciones){
 
 void LeoArch(char nomarch[],TMV *MV){
   FILE *arch;
-  char leo;
+  unsigned char leo;
   //char t_primer_byte,t_segundo_byte; POR SI NO LEE DE UNA EL SHORT INT.
   theader header;
   int i=0;
@@ -140,9 +140,12 @@ void LeoArch(char nomarch[],TMV *MV){
   fread(&header.version,sizeof(char),1,arch);
   //fread(&header.tam,sizeof(short int),1,arch); //No anda por que lo lee al reves (lee little endian)
   fread(&leo,sizeof(char),1,arch);
-  header.tam=leo<<8;
+  header.tam=leo;
+  header.tam=header.tam<<8;
   fread(&leo,sizeof(char),1,arch);
   header.tam+=leo;
+
+  //printf("FLAG LEOARCH TAMCS: %X\n",header.tam);
 
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
     if (header.version == 1){
@@ -206,6 +209,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
     finCS=posmaxCODESEGMENT(*MV);
     //printf("FINCS: %x \n");
+    //muestravaloresmv(*MV);
     while(MV->R[IP]<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
         //printf("dir actual:%d \n",DirFisicaActual);
@@ -220,7 +224,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
            //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS.
             MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
-            printf("IP: %x \n",MV->R[IP]);
+            //printf("IP: %x \n",MV->R[IP]);
         }else
             generaerror(1);
     }
@@ -797,6 +801,8 @@ void XOR(TMV * MV,TInstruc instruc){
     int auxXOR;
     unsigned char SecA,CodOpA;
 
+    //printf("FLAG ENTRA XOR\n");
+
     //OPB
     guardoOpB(*MV,instruc,&auxXOR);
 
@@ -941,10 +947,10 @@ void muestratds(int tds[]){
 }
 
 void muestravaloresmv(TMV mv){
-    //muestratds(mv.TDS);
+    muestratds(mv.TDS);
     muestraregistros(mv.R);
-    //muestramemoria(mv.MEM);
-    muestraDatasegment(mv,mv.MEM);
+    muestramemoria(mv.MEM);
+    //muestraDatasegment(mv,mv.MEM);
 }
 
 char obtienetipooperacion(unsigned char operacion){
@@ -1079,15 +1085,14 @@ void SYS (TMV *MV, TInstruc instruccion){
     El modo de escritura depende de la configuracion almacenada en AL.
 
 */
-    printf("entro al sys \n");
-    int i,operando,pos_inicial_memoria,numero;
+    //printf("entro al sys \n");
+    int i,operando,pos_inicial_memoria,numero,pos_max_acceso;
     char modo,celdas,size;
     char *bin;
     unsigned char Sec,Codreg;
 
-    muestravaloresmv(*MV);
+    //muestravaloresmv(*MV);
 
-    //guardoOpB(*MV,instruccion,&operando);
     if(instruccion.TamA==1){
         DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
         DefinoAuxRegistro(&operando,*MV,Sec,Codreg);
@@ -1101,18 +1106,18 @@ void SYS (TMV *MV, TInstruc instruccion){
         operando=LeoEnMemoria(*MV,instruccion.OpA);
 
     //SETEO VALORES
-    printf("Instruccion: OpA = %08X TamA= %08X\n",instruccion.OpA,instruccion.TamA);
-    printf("OPERANDO EN SYS: %X\n",operando);
+    //printf("Instruccion: OpA = %08X TamA= %08X\n",instruccion.OpA,instruccion.TamA);
+    //printf("OPERANDO EN SYS: %X\n",operando);
 
     modo= MV->R[EAX]& 0xFF;
-    printf("MODO: %d\n",modo);
+    //printf("MODO: %d\n",modo);
     celdas= MV->R[ECX]& 0xFF;
-    printf("Cantidad de celdas: %d\n",celdas);
+    //printf("Cantidad de celdas: %d\n",celdas);
     size= (MV->R[ECX]>>8)& 0xFF;
-    printf("Tamanio celda: %d\n",size);
+    //printf("Tamanio celda: %d\n",size);
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
     //El 0xFF creo que esta de mas pero por las dudas.
-    int pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size);
+    pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size);
     //printf("pos acceso maximo: %04X\n",pos_max_acceso-posmaxCODESEGMENT(*MV));
     /*  Aca tendria que checkear si hay error de segmento en todas las posiciones de memoria a las que voy a querer acceder?
     *   Si es asi puedo usar:
