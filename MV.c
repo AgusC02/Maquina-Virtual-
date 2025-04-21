@@ -1093,7 +1093,192 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
 */
 
 
+int leer_binario_c2_32(void) {
+    /**
+ * Lee por teclado de 1 a 32 dígitos binarios,
+ * los interpreta como un int en complemento a 2 de 32 bits
+ * (con ceros implícitos a la izquierda) y devuelve el valor.
+ */
+    char buffer[BUF_SIZE];
+    size_t len;
+    unsigned int uvalue;
+    int          svalue;
+
+    while (1) {
+        if (!fgets(buffer, sizeof(buffer), stdin)) {
+            fprintf(stderr, "Error al leer la entrada.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Quitar '\n' y medir longitud
+        buffer[strcspn(buffer, "\n")] = '\0';
+        len = strlen(buffer);
+
+        // Validar longitud 1–32
+        if (len == 0 || len > BITS_32) {
+            printf("Entrada inválida: ingresa entre 1 y %d dígitos binarios.\n\n", BITS_32);
+            continue;
+        }
+
+        // Validar que todos sean '0' o '1'
+        int valido = 1;
+        for (size_t i = 0; i < len; i++) {
+            if (buffer[i] != '0' && buffer[i] != '1') {
+                valido = 0;
+                break;
+            }
+        }
+        if (!valido) {
+            printf("Formato inválido: solo dígitos '0' o '1'.\n\n");
+            continue;
+        }
+
+        // Convertir a unsigned int (base 2)
+        uvalue = (unsigned int)strtoul(buffer, NULL, 2);
+
+        // Ajuste complemento a 2 (32 bits)
+        if (uvalue & (1U << (BITS_32 - 1))) {
+            svalue = (int)(uvalue - (1ULL << BITS_32));
+        } else {
+            svalue = (int)uvalue;
+        }
+
+        return svalue;
+    }
+}
+
+
 // -------------------------------------- FUNCIONES CON 1 OPERANDO
+void SYS (TMV *MV, TInstruc instruccion){
+/*  Ejecuta la llamada al sistema indicada por el valor del operando.
+    SYS 1 (READ): permite almacenar los datos leidos desde el teclado a partir de la posicion de memoria apuntada por EDX, guardandolo en CL celdas de tamaño CH.
+    El modo de lectura depende de la configuracion almacenada en AL.
+
+    SYS 2 (WRITE): muestra en pantalla los valores contenidos a partir de la posicion de memoria apuntada por EDX, recuperando CL celdas de tamaño CH.
+    El modo de escritura depende de la configuracion almacenada en AL.
+
+
+*/
+    
+    int i,operando,pos_inicial_memoria,numero;
+    char modo,celdas,size;
+
+    guardoOpB(*MV,instruccion,&operando);
+    //SETEO VALORES
+    
+    modo= MV->R[EAX]& 0xFF;
+    celdas= MV->R[ECX]& 0xFF;
+    size= (MV->R[ECX]>>8)& 0xFF;
+    pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
+    //El 0xFF creo que esta de mas pero por las dudas.
+    
+    /*  Aca tendria que checkear si hay error de segmento en todas las posiciones de memoria a las que voy a querer acceder?
+    *   Si es asi puedo usar:
+    *   -------------------
+    *   int pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size) ???? CHECKEAR Y PREGUNTAR 
+    *   -------------------
+    *   Ya que dentro de la funcion direccionamiento checkea el error de segmento.
+    *   Sino puedo hacerlo manualmente
+    *   
+    */
+
+    if(operando==1){    //READ
+        for(i=0;i<celdas;i++){
+            printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
+            if(modo==0x10){
+                //lee binario como string Y LO PASA A INT.
+                numero=leer_binario_c2_32();
+            }
+            else if (modo==0x08){
+                scanf("%X",&numero);
+            }
+            else if (modo==0x04){
+                scanf("%o",&numero);
+            }
+            else if (modo==0x02){
+                scanf("\n %c",&numero);
+            }
+            else if (modo==0x01){
+                scanf("%d",&numero);
+            }
+            // ESTA PARTE ESTA BIEN SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4. HAY QUE PREGUNTAR Y CORREGIR CON ALGUN FOR SINO.
+            if(size==1){
+                (*MV).MEM[pos_inicial_memoria++]=numero;
+                //pos_inicial_memoria+=1;
+            }
+            else if (size==2){
+                (*MV).MEM[pos_inicial_memoria++]=numero >> 8;
+                (*MV).MEM[pos_inicial_memoria++]=numero & 0xFF;
+            }
+            else if (size==3){
+                (*MV).MEM[pos_inicial_memoria++]=numero >> 16;
+                (*MV).MEM[pos_inicial_memoria++]=(numero << 8) >> 16;
+                (*MV).MEM[pos_inicial_memoria++]=numero & 0xFF;
+            }
+            else if (size==4){
+                (*MV).MEM[pos_inicial_memoria++]=numero >> 24;
+                (*MV).MEM[pos_inicial_memoria++]=(numero << 8) >> 24;
+                (*MV).MEM[pos_inicial_memoria++]=(numero << 16)>> 24;
+                (*MV).MEM[pos_inicial_memoria++]=numero & 0xFF;
+            }
+        }
+    }
+    else if (operando==2){ //WRITE.
+        for (i=0;i<posmaxCODESEGMENT(*MV);i++){
+            printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
+            // PASA LO MISMO CON EL WRITE. SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4 ESTA BIEN, SINO HAY QUE CORREGIR CON ALGUN FOR.
+            if(size==1){
+                numero=(*MV).MEM[pos_inicial_memoria++];
+            }
+            else if(size==2){
+                numero=(*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+            }
+            else if(size==3){
+                numero=(*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+            }
+            else if (size==4){
+                numero=(*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+                numero |= numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+            }
+            /*  IMPLEMENTADO CON UN FOR SERIA:
+                if (size >= 1 && size <= 4) {
+                // Leo el primer byte sin desplazar
+                numero = (*MV).MEM[pos_inicial_memoria++];
+                // Para cada byte adicional, desplazo y concateno
+                for (int i = 1; i < size; ++i) {
+                    numero = (numero << 8) | (*MV).MEM[pos_inicial_memoria++];
+                }
+            */
+            if(modo & 0x08)
+                printf("0x%X ",numero);
+            if(modo & 0x04)
+                printf("0o%o ",numero);
+            if(modo & 0x02){
+                if(numero<1 || numero>255)
+                    printf(". ");
+                else
+                    printf("%c ",numero);
+            }
+            if(modo & 0x01)
+                printf("%d ",numero);
+            printf("\n");        
+        }
+    }
+    else
+        generaerror(1); //ESTO NO SE SI SE HACE PERO BUENO.
+}
+
 void JMP (TMV *MV,TInstruc instruccion){
     //Efectua un salto incondicional a la celda del segmento de codigo indicada en el operando.
     int asignable,auxCodReg,auxReg;
@@ -1264,3 +1449,7 @@ void JNN (TMV *MV, TInstruc instruccion){
     }
 }
 
+// -------------------------------------- FUNCIONES SIN OPERANDO
+void STOP(TMV *MV,TInstruc instruccion){
+    exit (0);
+}

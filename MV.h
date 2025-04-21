@@ -5,6 +5,9 @@
 #define CANTREG 16
 #define CANTERRORES 3
 #define TDDSSIZE 8
+//DEFINES PARA EL SYS
+#define BITS_32 32
+#define BUF_SIZE (BITS_32 + 2)
 
 // Define de registros
 #define CS 0
