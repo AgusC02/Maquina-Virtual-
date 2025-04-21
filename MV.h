@@ -1,10 +1,13 @@
 #ifndef TMV_H_INCLUDED
 #define TMV_H_INCLUDED
 #define TMEM 16384
-#define CANTFUNC 30
+#define CANTFUNC 31
 #define CANTREG 16
 #define CANTERRORES 3
 #define TDDSSIZE 8
+//DEFINES PARA EL SYS
+#define BITS_32 32
+#define BUF_SIZE (BITS_32 + 2)
 
 // Define de registros
 #define CS 0
@@ -39,6 +42,7 @@ typedef struct TMV{
 
 typedef struct TInstruc{
   int OpA,OpB,TamA,TamB; // OpA = Valor A
+  unsigned char inst;
 }TInstruc;
 
 
@@ -47,19 +51,35 @@ typedef void (*TFunc[CANTFUNC])(TMV *mv,TInstruc instruc); //Array de punteros a
 void inicializoTDS(TMV* MV,short int TamCS);
 void inicializoRegistros(TMV *MV);
 void inicializoErrores(TMV *MV);
+void generaerror(int tipo);
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]); //PARA DISASSEMBLER
 void inicializoVecRegistros(char VecRegistros[CANTREG][4]);  //PARA DISASSEMBLER
 void declaroFunciones(TFunc Funciones);
 void LeoArch(char nomarch[],TMV *MV);
-int direccionamiento_logtofis(TMV *MV, int reg);
-void LeoInstruccion(TMV* MV,TFunc Funciones, int *Error);
-void ComponentesInstruccion(int Instruccion,TInstruc *instruc, int *CantOp, int *CodOp);
-void SeteoValorOp(TMV* MV,int DirFisicaActual,TInstruc *instruc);
-void DefinoRegistro(unsigned char *Sec , int *CodOp, int Op);
+int posmaxCODESEGMENT(TMV MV);
+int direccionamiento_logtofis(TMV MV, int puntero);
+void LeoInstruccion(TMV* MV);
+void ComponentesInstruccion(TMV MV,int DirFisica,TInstruc *instruc, int *CantOp, unsigned char *CodOp);
+void SeteoValorOp(TMV MV,int DirFisicaActual,TInstruc *instruc);
+void DefinoRegistro(unsigned char *Sec , unsigned char *CodOp, int Op);
 void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int Op);
-int LeoEnMemoria(TMV *MV,int Op);
+int LeoEnMemoria(TMV MV,int Op);
 int GuardoValorMemoria(TMV *MV,int Op);
 void EscriboEnMemoria(TMV *MV,int Op, int Valor);
+void modificoCC(TMV *MV,int Resultado);
+void guardoOpB(TMV MV, TInstruc instruc, int *auxOpB);
+char sobrepasaCS(TMV MV,int asignable);
+int devuelveN(TMV *MV);
+int devuelveZ(TMV *MV);
+int leer_binario_c2_32(void);
+char *int_to_c2bin(int numero);
+
+//DEBUG
+void muestramemoria(unsigned char memoria[]);
+void muestraregistros(int reg[]);
+void muestratds(int tds[]);
+void muestravaloresmv(TMV mv);
+char obtienetipooperacion(unsigned char operacion);
 
 //FUNCIONES
 
@@ -117,5 +137,10 @@ void NOT(TMV * MV,TInstruc instruc);
 //0 OPERANDOS
 
 void STOP(TMV * MV,TInstruc instruc);
+
+// DISSASSEMBLER
+void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
+void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc,unsigned short int PosInicial,unsigned short int PosMemoria);
+void GuardoSector(char Segmento[4],unsigned char Sec);
 
 #endif // MV_H_INCLUDED
