@@ -1095,9 +1095,9 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
 
 int leer_binario_c2_32(void) {
     /**
- * Lee por teclado de 1 a 32 dígitos binarios,
+ * Lee por teclado de 1 a 32 d�gitos binarios,
  * los interpreta como un int en complemento a 2 de 32 bits
- * (con ceros implícitos a la izquierda) y devuelve el valor.
+ * (con ceros impl�citos a la izquierda) y devuelve el valor.
  */
     char buffer[BUF_SIZE];
     size_t len;
@@ -1114,9 +1114,9 @@ int leer_binario_c2_32(void) {
         buffer[strcspn(buffer, "\n")] = '\0';
         len = strlen(buffer);
 
-        // Validar longitud 1–32
+        // Validar longitud 1�32
         if (len == 0 || len > BITS_32) {
-            printf("Entrada inválida: ingresa entre 1 y %d dígitos binarios.\n\n", BITS_32);
+            printf("Entrada inv�lida: ingresa entre 1 y %d d�gitos binarios.\n\n", BITS_32);
             continue;
         }
 
@@ -1129,7 +1129,7 @@ int leer_binario_c2_32(void) {
             }
         }
         if (!valido) {
-            printf("Formato inválido: solo dígitos '0' o '1'.\n\n");
+            printf("Formato inv�lido: solo d�gitos '0' o '1'.\n\n");
             continue;
         }
 
@@ -1148,38 +1148,73 @@ int leer_binario_c2_32(void) {
 }
 
 
+char *int_to_c2bin(int numero) {
+    /**
+    * Convierte un `int` (asumiendo 32 bits) a su representaci�n
+    * en complemento a 2 y devuelve un puntero a una cadena reci�n
+    * alocada que contiene dicha representaci�n sin ceros a la izquierda.
+    *
+    * Si el n�mero es 0, la cadena ser� "0".
+    * El llamador debe liberar el buffer con free().
+    */
+
+    char full[BITS_32 + 1];
+    unsigned int u = (unsigned int) numero;
+
+    // Generar la cadena completa de 32 bits
+    for (int i = BITS_32 - 1; i >= 0; --i) {
+        full[i] = (u & 1) ? '1' : '0';
+        u >>= 1;
+    }
+    full[BITS_32] = '\0';
+
+    // Encontrar el primer '1', o dejar el �ltimo '0' si es todo ceros
+    char *p = full;
+    while (*p == '0' && *(p + 1) != '\0') {
+        ++p;
+    }
+
+    // Copiar a un buffer de tama�o justo
+    size_t len = strlen(p);
+    char *trimmed = malloc(len + 1);
+    if (!trimmed) return NULL;
+    memcpy(trimmed, p, len + 1);
+    return trimmed;
+}
+
 // -------------------------------------- FUNCIONES CON 1 OPERANDO
 void SYS (TMV *MV, TInstruc instruccion){
 /*  Ejecuta la llamada al sistema indicada por el valor del operando.
-    SYS 1 (READ): permite almacenar los datos leidos desde el teclado a partir de la posicion de memoria apuntada por EDX, guardandolo en CL celdas de tamaño CH.
+    SYS 1 (READ): permite almacenar los datos leidos desde el teclado a partir de la posicion de memoria apuntada por EDX, guardandolo en CL celdas de tama�o CH.
     El modo de lectura depende de la configuracion almacenada en AL.
 
-    SYS 2 (WRITE): muestra en pantalla los valores contenidos a partir de la posicion de memoria apuntada por EDX, recuperando CL celdas de tamaño CH.
+    SYS 2 (WRITE): muestra en pantalla los valores contenidos a partir de la posicion de memoria apuntada por EDX, recuperando CL celdas de tama�o CH.
     El modo de escritura depende de la configuracion almacenada en AL.
 
 
 */
-    
+
     int i,operando,pos_inicial_memoria,numero;
     char modo,celdas,size;
+    char *bin;
 
     guardoOpB(*MV,instruccion,&operando);
     //SETEO VALORES
-    
+
     modo= MV->R[EAX]& 0xFF;
     celdas= MV->R[ECX]& 0xFF;
     size= (MV->R[ECX]>>8)& 0xFF;
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
     //El 0xFF creo que esta de mas pero por las dudas.
-    
+
     /*  Aca tendria que checkear si hay error de segmento en todas las posiciones de memoria a las que voy a querer acceder?
     *   Si es asi puedo usar:
     *   -------------------
-    *   int pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size) ???? CHECKEAR Y PREGUNTAR 
+    *   int pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size) ???? CHECKEAR Y PREGUNTAR
     *   -------------------
     *   Ya que dentro de la funcion direccionamiento checkea el error de segmento.
     *   Sino puedo hacerlo manualmente
-    *   
+    *
     */
 
     if(operando==1){    //READ
@@ -1260,6 +1295,15 @@ void SYS (TMV *MV, TInstruc instruccion){
                     numero = (numero << 8) | (*MV).MEM[pos_inicial_memoria++];
                 }
             */
+            if(modo&0x10){
+                //Funcion que toma el numero (entero de 32 bits) y lo transforma en un string con formato 0b numero
+                bin = int_to_c2bin(numero);
+                if(!bin){
+                    printf(stderr,"ERROR DE MEMORIA EN SYS WRITE BINARIO\n");
+                    exit(0);
+                }
+                printf("0b%s ",bin);
+            }
             if(modo & 0x08)
                 printf("0x%X ",numero);
             if(modo & 0x04)
@@ -1272,7 +1316,7 @@ void SYS (TMV *MV, TInstruc instruccion){
             }
             if(modo & 0x01)
                 printf("%d ",numero);
-            printf("\n");        
+            printf("\n");
         }
     }
     else
