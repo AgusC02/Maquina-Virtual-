@@ -1303,6 +1303,7 @@ void SYS (TMV *MV, TInstruc instruccion){
                     exit(0);
                 }
                 printf("0b%s ",bin);
+                free(bin);
             }
             if(modo & 0x08)
                 printf("0x%X ",numero);
@@ -1493,6 +1494,9 @@ void JNN (TMV *MV, TInstruc instruccion){
     }
 }
 
+void NOT (TMV *MV, TInstruc instruccion){
+
+}
 // -------------------------------------- FUNCIONES SIN OPERANDO
 void STOP(TMV *MV,TInstruc instruccion){
     exit (0);
