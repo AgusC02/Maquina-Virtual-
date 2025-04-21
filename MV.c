@@ -906,6 +906,20 @@ void muestramemoria(unsigned char memoria[]){
     }
 }
 
+void muestraDatasegment(TMV MV,unsigned char memoria[]){
+    int pos_i,ultposcs;
+    int pos_f;
+
+    ultposcs=posmaxCODESEGMENT(MV);
+    pos_i=ultposcs;
+    pos_f=pos_i+20;
+
+    while(pos_i<=pos_f){
+        printf("[%08X] = %02X \n",pos_i-ultposcs,memoria[pos_i]);
+        pos_i++;
+    }
+}
+
 void muestraregistros(int reg[]){
     int i;
     char VecRegistros[CANTREG][4];
@@ -927,9 +941,10 @@ void muestratds(int tds[]){
 }
 
 void muestravaloresmv(TMV mv){
-    muestratds(mv.TDS);
+    //muestratds(mv.TDS);
     muestraregistros(mv.R);
-    muestramemoria(mv.MEM);
+    //muestramemoria(mv.MEM);
+    muestraDatasegment(mv,mv.MEM);
 }
 
 char obtienetipooperacion(unsigned char operacion){
@@ -1070,6 +1085,8 @@ void SYS (TMV *MV, TInstruc instruccion){
     char *bin;
     unsigned char Sec,Codreg;
 
+    muestravaloresmv(*MV);
+
     //guardoOpB(*MV,instruccion,&operando);
     if(instruccion.TamA==1){
         DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
@@ -1171,7 +1188,7 @@ void SYS (TMV *MV, TInstruc instruccion){
                 numero |= (*MV).MEM[pos_inicial_memoria++];
                 numero=numero<<8;
                 numero |= (*MV).MEM[pos_inicial_memoria++];
-                numero |= numero<<8;
+                numero = numero<<8;
                 numero |= (*MV).MEM[pos_inicial_memoria++];
             }
             /*  IMPLEMENTADO CON UN FOR SERIA:
