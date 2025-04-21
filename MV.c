@@ -1112,7 +1112,8 @@ void SYS (TMV *MV, TInstruc instruccion){
     printf("Tamanio celda: %d\n",size);
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
     //El 0xFF creo que esta de mas pero por las dudas.
-
+    int pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size);
+    //printf("pos acceso maximo: %04X\n",pos_max_acceso-posmaxCODESEGMENT(*MV));
     /*  Aca tendria que checkear si hay error de segmento en todas las posiciones de memoria a las que voy a querer acceder?
     *   Si es asi puedo usar:
     *   -------------------
