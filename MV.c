@@ -303,7 +303,7 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago l
 }
 
 int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
-    int aux=0,PosReg,offset,CodReg,puntero;
+    int aux=0,PosMemoria,PosMemoriaFinal,offset,CodReg,puntero;
 /*  OPERANDO DE MEMORIA [5]
     00 -->
           } OFFSET
@@ -317,13 +317,12 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
 
     puntero=(MV).R[CodReg]+offset;
 
-
-
-    PosReg = direccionamiento_logtofis(MV,puntero);
+    PosMemoria = direccionamiento_logtofis(MV,puntero);
+    PosMemoriaFinal = direccionamiento_logtofis(MV,puntero+4); // Solo lo uso para validar que no se cae del segmento
 
     for (int i=0;i<4;i++){
-        aux+=MV.MEM[PosReg];
-        PosReg++;
+        aux+=MV.MEM[PosMemoria];
+        PosMemoria++;
         if (4-i > 1)
             aux=aux << 8;
     }
@@ -335,18 +334,19 @@ void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes 
 
     //HAY QUE CHECKEAR ESTA FUNCION, LA USAMOS MUCHO Y TENEMOS QUE CHECKEAR SI OCURRE FALLO DE SEGMENTO.
     int offset,CodReg,puntero;
-    int PosReg;
+    int PosMemoria,PosMemoriaFinal;
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
 
     puntero=(*MV).R[CodReg]+offset;
 
-    PosReg = direccionamiento_logtofis(*MV,puntero);
+    PosMemoria = direccionamiento_logtofis(*MV,puntero);
+    PosMemoriaFinal = direccionamiento_logtofis(*MV,puntero+4); // Solo lo uso para validar que no se cae del segmento
 
     for (int i=0;i<4;i++){
-        MV->MEM[PosReg] = (Valor & 0XFF000000) >> 24;
-        PosReg++;
+        MV->MEM[PosMemoria] = (Valor & 0XFF000000) >> 24;
+        PosMemoria++;
         if (4-i > 1)
             Valor=Valor << 8;
     }
