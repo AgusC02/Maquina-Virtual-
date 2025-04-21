@@ -1093,7 +1093,237 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
 */
 
 
+int leer_binario_c2_32(void) {
+    /**
+ * Lee por teclado de 1 a 32 d�gitos binarios,
+ * los interpreta como un int en complemento a 2 de 32 bits
+ * (con ceros impl�citos a la izquierda) y devuelve el valor.
+ */
+    char buffer[BUF_SIZE];
+    size_t len;
+    unsigned int uvalue;
+    int          svalue;
+
+    while (1) {
+        if (!fgets(buffer, sizeof(buffer), stdin)) {
+            fprintf(stderr, "Error al leer la entrada.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Quitar '\n' y medir longitud
+        buffer[strcspn(buffer, "\n")] = '\0';
+        len = strlen(buffer);
+
+        // Validar longitud 1�32
+        if (len == 0 || len > BITS_32) {
+            printf("Entrada inv�lida: ingresa entre 1 y %d d�gitos binarios.\n\n", BITS_32);
+            continue;
+        }
+
+        // Validar que todos sean '0' o '1'
+        int valido = 1;
+        for (size_t i = 0; i < len; i++) {
+            if (buffer[i] != '0' && buffer[i] != '1') {
+                valido = 0;
+                break;
+            }
+        }
+        if (!valido) {
+            printf("Formato inv�lido: solo d�gitos '0' o '1'.\n\n");
+            continue;
+        }
+
+        // Convertir a unsigned int (base 2)
+        uvalue = (unsigned int)strtoul(buffer, NULL, 2);
+
+        // Ajuste complemento a 2 (32 bits)
+        if (uvalue & (1U << (BITS_32 - 1))) {
+            svalue = (int)(uvalue - (1ULL << BITS_32));
+        } else {
+            svalue = (int)uvalue;
+        }
+
+        return svalue;
+    }
+}
+
+
+char *int_to_c2bin(int numero) {
+    /**
+    * Convierte un `int` (asumiendo 32 bits) a su representaci�n
+    * en complemento a 2 y devuelve un puntero a una cadena reci�n
+    * alocada que contiene dicha representaci�n sin ceros a la izquierda.
+    *
+    * Si el n�mero es 0, la cadena ser� "0".
+    * El llamador debe liberar el buffer con free().
+    */
+
+    char full[BITS_32 + 1];
+    unsigned int u = (unsigned int) numero;
+
+    // Generar la cadena completa de 32 bits
+    for (int i = BITS_32 - 1; i >= 0; --i) {
+        full[i] = (u & 1) ? '1' : '0';
+        u >>= 1;
+    }
+    full[BITS_32] = '\0';
+
+    // Encontrar el primer '1', o dejar el �ltimo '0' si es todo ceros
+    char *p = full;
+    while (*p == '0' && *(p + 1) != '\0') {
+        ++p;
+    }
+
+    // Copiar a un buffer de tama�o justo
+    size_t len = strlen(p);
+    char *trimmed = malloc(len + 1);
+    if (!trimmed) return NULL;
+    memcpy(trimmed, p, len + 1);
+    return trimmed;
+}
+
 // -------------------------------------- FUNCIONES CON 1 OPERANDO
+void SYS (TMV *MV, TInstruc instruccion){
+/*  Ejecuta la llamada al sistema indicada por el valor del operando.
+    SYS 1 (READ): permite almacenar los datos leidos desde el teclado a partir de la posicion de memoria apuntada por EDX, guardandolo en CL celdas de tama�o CH.
+    El modo de lectura depende de la configuracion almacenada en AL.
+
+    SYS 2 (WRITE): muestra en pantalla los valores contenidos a partir de la posicion de memoria apuntada por EDX, recuperando CL celdas de tama�o CH.
+    El modo de escritura depende de la configuracion almacenada en AL.
+
+
+*/
+
+    int i,operando,pos_inicial_memoria,numero;
+    char modo,celdas,size;
+    char *bin;
+
+    guardoOpB(*MV,instruccion,&operando);
+    //SETEO VALORES
+
+    modo= MV->R[EAX]& 0xFF;
+    celdas= MV->R[ECX]& 0xFF;
+    size= (MV->R[ECX]>>8)& 0xFF;
+    pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
+    //El 0xFF creo que esta de mas pero por las dudas.
+
+    /*  Aca tendria que checkear si hay error de segmento en todas las posiciones de memoria a las que voy a querer acceder?
+    *   Si es asi puedo usar:
+    *   -------------------
+    *   int pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size) ???? CHECKEAR Y PREGUNTAR
+    *   -------------------
+    *   Ya que dentro de la funcion direccionamiento checkea el error de segmento.
+    *   Sino puedo hacerlo manualmente
+    *
+    */
+
+    if(operando==1){    //READ
+        for(i=0;i<celdas;i++){
+            printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
+            if(modo==0x10){
+                //lee binario como string Y LO PASA A INT.
+                numero=leer_binario_c2_32();
+            }
+            else if (modo==0x08){
+                scanf("%X",&numero);
+            }
+            else if (modo==0x04){
+                scanf("%o",&numero);
+            }
+            else if (modo==0x02){
+                scanf("\n %c",&numero);
+            }
+            else if (modo==0x01){
+                scanf("%d",&numero);
+            }
+            // ESTA PARTE ESTA BIEN SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4. HAY QUE PREGUNTAR Y CORREGIR CON ALGUN FOR SINO.
+            if(size==1){
+                (*MV).MEM[pos_inicial_memoria++]=numero;
+                //pos_inicial_memoria+=1;
+            }
+            else if (size==2){
+                (*MV).MEM[pos_inicial_memoria++]=numero >> 8;
+                (*MV).MEM[pos_inicial_memoria++]=numero & 0xFF;
+            }
+            else if (size==3){
+                (*MV).MEM[pos_inicial_memoria++]=numero >> 16;
+                (*MV).MEM[pos_inicial_memoria++]=(numero << 8) >> 16;
+                (*MV).MEM[pos_inicial_memoria++]=numero & 0xFF;
+            }
+            else if (size==4){
+                (*MV).MEM[pos_inicial_memoria++]=numero >> 24;
+                (*MV).MEM[pos_inicial_memoria++]=(numero << 8) >> 24;
+                (*MV).MEM[pos_inicial_memoria++]=(numero << 16)>> 24;
+                (*MV).MEM[pos_inicial_memoria++]=numero & 0xFF;
+            }
+        }
+    }
+    else if (operando==2){ //WRITE.
+        for (i=0;i<posmaxCODESEGMENT(*MV);i++){
+            printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
+            // PASA LO MISMO CON EL WRITE. SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4 ESTA BIEN, SINO HAY QUE CORREGIR CON ALGUN FOR.
+            if(size==1){
+                numero=(*MV).MEM[pos_inicial_memoria++];
+            }
+            else if(size==2){
+                numero=(*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+            }
+            else if(size==3){
+                numero=(*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+            }
+            else if (size==4){
+                numero=(*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+                numero=numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+                numero |= numero<<8;
+                numero |= (*MV).MEM[pos_inicial_memoria++];
+            }
+            /*  IMPLEMENTADO CON UN FOR SERIA:
+                if (size >= 1 && size <= 4) {
+                // Leo el primer byte sin desplazar
+                numero = (*MV).MEM[pos_inicial_memoria++];
+                // Para cada byte adicional, desplazo y concateno
+                for (int i = 1; i < size; ++i) {
+                    numero = (numero << 8) | (*MV).MEM[pos_inicial_memoria++];
+                }
+            */
+            if(modo&0x10){
+                //Funcion que toma el numero (entero de 32 bits) y lo transforma en un string con formato 0b numero
+                bin = int_to_c2bin(numero);
+                if(!bin){
+                    printf(stderr,"ERROR DE MEMORIA EN SYS WRITE BINARIO\n");
+                    exit(0);
+                }
+                printf("0b%s ",bin);
+                free(bin);
+            }
+            if(modo & 0x08)
+                printf("0x%X ",numero);
+            if(modo & 0x04)
+                printf("0o%o ",numero);
+            if(modo & 0x02){
+                if(numero<1 || numero>255)
+                    printf(". ");
+                else
+                    printf("%c ",numero);
+            }
+            if(modo & 0x01)
+                printf("%d ",numero);
+            printf("\n");
+        }
+    }
+    else
+        generaerror(1); //ESTO NO SE SI SE HACE PERO BUENO.
+}
+
 void JMP (TMV *MV,TInstruc instruccion){
     //Efectua un salto incondicional a la celda del segmento de codigo indicada en el operando.
     int asignable,auxCodReg,auxReg;
@@ -1264,3 +1494,54 @@ void JNN (TMV *MV, TInstruc instruccion){
     }
 }
 
+void NOT (TMV *MV, TInstruc instruccion){
+// Efectua la negacion bit a bit del operando y afectan al registro CC.
+// El resultado se almacena en el primer operando.
+    int resultado,aux;
+    unsigned char auxSec,auxCodReg;
+
+    if(instruccion.TamA==1){ //Operando de registro
+        DefinoRegistro(&auxSec,&auxCodReg,instruccion.OpA);
+        DefinoAuxRegistro(&aux,*MV,auxSec,auxCodReg);
+        resultado=~aux;
+        if(auxSec==0)
+            (*MV).R[auxCodReg]=resultado;
+        else if (auxSec==1){
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]>>8;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]<<8;
+            resultado=resultado & 0xFF;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]&resultado;
+            //propagacion de signo para mandarlo a modificaCC
+            resultado=resultado<<32;
+            resultado=resultado>>32;
+        }
+        else if(auxSec==3){
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]>>16;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]<<16;
+            resultado=resultado&0xFFFF;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]&resultado;
+            //Propagacion de signo para mandarlo a modificaCC.
+            resultado=resultado<<16;
+            resultado=resultado>>16;
+        }
+        else if(auxSec==2){
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg]&0xFFFF00FF;
+            resultado=resultado & 0x000000FF;
+            (*MV).R[auxCodReg]=(*MV).R[auxCodReg] & (resultado<<8);
+            //Propagacion de signo para mandarlo a modificoCC
+            resultado=resultado<<32; // Esto tiene en cuenta que DefinoAuxRegistro no me lo devuelve colocado en AH sino en AL lo que habia en AH.
+            resultado=resultado<<32;
+        }
+    }
+    else if (instruccion.TamA==3){ //Operando de memoria
+        aux=LeoEnMemoria(*MV,instruccion.OpA);
+        resultado=~aux;
+        EscriboEnMemoria(MV,instruccion.OpA,resultado);
+    }
+    
+    modificoCC(MV,resultado);
+}
+// -------------------------------------- FUNCIONES SIN OPERANDO
+void STOP(TMV *MV,TInstruc instruccion){
+    exit (0);
+}
