@@ -602,7 +602,7 @@ void DIV(TMV * MV,TInstruc instruc){
     guardoOpB(*MV,instruc,&divisor);
 
     if (divisor == 0)
-        generaerror(1);
+        generaerror(0);
     else{
        //OPA
        int Dividendo;
