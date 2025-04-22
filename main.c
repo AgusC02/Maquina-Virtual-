@@ -19,7 +19,7 @@ int main(int argc, char *argv[]){
     //declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
-    if(argc>1){
+    if(argc>2){
         if (!strcmp(argv[2],"-d")){
             LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
         }
