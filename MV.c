@@ -1221,7 +1221,7 @@ void SYS (TMV *MV, TInstruc instruccion){
             if(modo & 0x04)
                 printf("0o%o ",numero);
             if(modo & 0x02){
-                if(numero<1 || numero>255)
+                if(numero<32 || numero>126)
                     printf(". ");
                 else
                     printf("%c ",numero);
