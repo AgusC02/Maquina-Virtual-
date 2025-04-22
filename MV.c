@@ -973,14 +973,14 @@ char sobrepasaCS(TMV MV,int asignable){
 }
 
 int devuelveN(TMV *MV){
-    int i;
+    int i=0;
     i=((*MV).R[CC]>>31) & 1;
     return i;
 }
 
 
 int devuelveZ(TMV *MV){
-    int i;
+    int i=0;
     i=((*MV).R[CC]>>30) & 1;
     return i;
 }
