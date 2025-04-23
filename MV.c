@@ -933,7 +933,7 @@ void muestratds(int tds[]){
 }
 
 void muestravaloresmv(TMV mv){
-    muestratds(mv.TDS);
+    //muestratds(mv.TDS);
     muestraregistros(mv.R);
     muestramemoria(mv.MEM);
     muestraDatasegment(mv,mv.MEM);
