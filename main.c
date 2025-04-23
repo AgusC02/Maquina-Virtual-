@@ -15,8 +15,6 @@ int main(int argc, char *argv[]){
     strcpy(nomarch,argv[1]);
     LeoArch(nomarch,&MV);
 
-    // abort();
-    //declaroFunciones(Funciones);
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
     if(argc>2){
@@ -25,14 +23,9 @@ int main(int argc, char *argv[]){
         }
     }
     LeoInstruccion(&MV);
-    
-
 
     //PARA DEBUGEAR
     //muestravaloresmv(MV);
-
-
-
 
 return 0;
 }
