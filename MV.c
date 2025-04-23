@@ -788,7 +788,6 @@ void XOR(TMV * MV,TInstruc instruc){
     int auxXOR;
     unsigned char SecA,CodOpA;
 
-    //printf("FLAG ENTRA XOR\n");
 
     //OPB
     guardoOpB(*MV,instruc,&auxXOR);
@@ -1077,7 +1076,6 @@ void SYS (TMV *MV, TInstruc instruccion){
     char *bin;
     unsigned char Sec,Codreg;
 
-    //muestravaloresmv(*MV);
 
     if(instruccion.TamA==1){
         DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
@@ -1504,7 +1502,7 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
         }
         else { //Registro
             DefinoRegistro(&SecA,&CodReg,instruc.OpA);
-            if (instruc.OpA >= 10){
+            if (CodReg >= 10){
                 strcpy(AuxSeg,VecRegistros[CodReg]);
                 GuardoSector(AuxSeg,SecA);
                 if (SecA == 0)
