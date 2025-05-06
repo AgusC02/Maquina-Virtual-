@@ -1096,19 +1096,11 @@ void SYS (TMV *MV, TInstruc instruccion){
     size= (MV->R[ECX]>>8)& 0xFF;
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
 
-    pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size);
-    /*  Aca tendria que checkear si hay error de segmento en todas las posiciones de memoria a las que voy a querer acceder?
-    *   Si es asi puedo usar:
-    *   -------------------
-    *   int pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size) ???? CHECKEAR Y PREGUNTAR
-    *   -------------------
-    *   Ya que dentro de la funcion direccionamiento checkea el error de segmento.
-    *   Sino puedo hacerlo manualmente
-    *
-    */
+    pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size); // Para verificar fallo de segmento.
+   
     if(operando==1){    //READ
         for(i=0;i<celdas;i++){
-            printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
+            printf("[%04X] ",pos_inicial_memoria);
             if(modo==0x10){
                 //lee binario como string Y LO PASA A INT.
                 numero=leer_binario_c2_32();
@@ -1148,7 +1140,7 @@ void SYS (TMV *MV, TInstruc instruccion){
     }
     else if (operando==2){ //WRITE.
         for (i=0;i<celdas;i++){
-            printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
+            printf("[%04X] ",pos_inicial_memoria);
             // PASA LO MISMO CON EL WRITE. SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4 ESTA BIEN, SINO HAY QUE CORREGIR CON ALGUN FOR.
             if(size==1){
                 numero=(*MV).MEM[pos_inicial_memoria++];
