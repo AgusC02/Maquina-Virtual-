@@ -127,7 +127,6 @@ void declaroFunciones(TFunc Funciones){
 void LeoArch(char nomarch[],TMV *MV){
   FILE *arch;
   unsigned char leo;
-  //char t_primer_byte,t_segundo_byte; POR SI NO LEE DE UNA EL SHORT INT.
   theader header;
   int i=0;
   //DEBO PREPARAR ARCHIVO PARA LECTURA
@@ -138,14 +137,14 @@ void LeoArch(char nomarch[],TMV *MV){
   fread(&header.c4,sizeof(char),1,arch);
   fread(&header.c5,sizeof(char),1,arch);
   fread(&header.version,sizeof(char),1,arch);
-  //fread(&header.tam,sizeof(short int),1,arch); //No anda por que lo lee al reves (lee little endian)
+
   fread(&leo,sizeof(char),1,arch);
   header.tam=leo;
   header.tam=header.tam<<8;
   fread(&leo,sizeof(char),1,arch);
   header.tam+=leo;
 
-  //printf("FLAG LEOARCH TAMCS: %X\n",header.tam);
+
 
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
     if (header.version == 1){
@@ -166,13 +165,12 @@ void LeoArch(char nomarch[],TMV *MV){
 int direccionamiento_logtofis(TMV MV, int puntero){
     int DirBase,Offset,DirFisica,TamSeg,LimiteSup;
 
-    //printf("PUNTERO: %08X \n",puntero);
+
     DirBase = ((MV.TDS[(puntero & 0XFFFF0000) >> 16] ) & 0XFFFF0000) >> 16;
-    //printf("DirBase: %d \n",DirBase);
     Offset = puntero & 0X0000FFFF;
-    //printf("Offset: %d \n",Offset);
+
     DirFisica = DirBase + Offset;
-    //printf("DirFisica: %d \n",DirFisica);
+
     TamSeg = ((MV.TDS[(puntero & 0XFFFF0000) >> 16] ) & 0XFFFF);
     LimiteSup = DirBase + TamSeg;
 
@@ -208,14 +206,12 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
     declaroFunciones(Funciones);
 
     finCS=posmaxCODESEGMENT(*MV);
-    //printf("FINCS: %x \n");
-    //muestravaloresmv(*MV);
+
     while(MV->R[IP]<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
-        //printf("dir actual:%d \n",DirFisicaActual);
+
         ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
-        //printf("CodOp:%x \n",CodOp);
-        //printf("CantOp: %d",CantOp);
+
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
             if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
                SeteoValorOp(*MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
@@ -224,7 +220,6 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
            //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS.
             MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
-            //printf("IP: %x \n",MV->R[IP]);
         }else
             generaerror(1);
     }
@@ -233,7 +228,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 void ComponentesInstruccion(TMV MV,int DirFisica,TInstruc *instruc, int *CantOp, unsigned char *CodOp){
   //A priori no se cual es el opA y opB, suponemos que son 2 operandos, mas abajo, verifico.
   unsigned char Instruccion = MV.MEM[DirFisica];
-  //printf("DirFisica: %d, Instruccion: %x ",DirFisica, Instruccion);
+
   instruc->TamB = (Instruccion & 0x000000C0) >> 6;
   instruc->TamA = (Instruccion & 0x00000030) >> 4;
   *CodOp = Instruccion & 0x1F;
@@ -308,13 +303,6 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago l
 
 int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
     int aux=0,PosMemoria,PosMemoriaFinal,offset,CodReg,puntero;
-/*  OPERANDO DE MEMORIA [5]
-    00 -->
-          } OFFSET
-    05 -->
-    10 --> DS
-    EN 1 BYTE = OFFSET (16BIT) CodReg(4bit)
-    */
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
@@ -410,7 +398,6 @@ void MOV(TMV * MV,TInstruc instruc){
      else{ //Es memoria ya que no se puede guardar nada en un inmediato
         EscriboEnMemoria(MV,instruc.OpA,mover);
     }
-
 }
 
 void ADD(TMV * MV,TInstruc instruc){
@@ -602,7 +589,7 @@ void DIV(TMV * MV,TInstruc instruc){
     guardoOpB(*MV,instruc,&divisor);
 
     if (divisor == 0)
-        generaerror(1);
+        generaerror(0);
     else{
        //OPA
        int Dividendo;
@@ -801,7 +788,6 @@ void XOR(TMV * MV,TInstruc instruc){
     int auxXOR;
     unsigned char SecA,CodOpA;
 
-    //printf("FLAG ENTRA XOR\n");
 
     //OPB
     guardoOpB(*MV,instruc,&auxXOR);
@@ -826,7 +812,7 @@ void XOR(TMV * MV,TInstruc instruc){
     }
      else{
         int AuxResXOR;
-        AuxResXOR = LeoEnMemoria(*MV,instruc.OpA) & auxXOR;
+        AuxResXOR = LeoEnMemoria(*MV,instruc.OpA) ^ auxXOR;
         modificoCC(MV,AuxResXOR);
         EscriboEnMemoria(MV,instruc.OpA,AuxResXOR);
     }
@@ -973,14 +959,14 @@ char sobrepasaCS(TMV MV,int asignable){
 }
 
 int devuelveN(TMV *MV){
-    int i;
+    int i=0;
     i=((*MV).R[CC]>>31) & 1;
     return i;
 }
 
 
 int devuelveZ(TMV *MV){
-    int i;
+    int i=0;
     i=((*MV).R[CC]>>30) & 1;
     return i;
 }
@@ -1085,13 +1071,11 @@ void SYS (TMV *MV, TInstruc instruccion){
     El modo de escritura depende de la configuracion almacenada en AL.
 
 */
-    //printf("entro al sys \n");
-    int i,operando,pos_inicial_memoria,numero,pos_max_acceso;
-    char modo,celdas,size;
+    int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso;
+    char modo,celdas,size,imprimible;
     char *bin;
     unsigned char Sec,Codreg;
 
-    //muestravaloresmv(*MV);
 
     if(instruccion.TamA==1){
         DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
@@ -1106,31 +1090,17 @@ void SYS (TMV *MV, TInstruc instruccion){
         operando=LeoEnMemoria(*MV,instruccion.OpA);
 
     //SETEO VALORES
-    //printf("Instruccion: OpA = %08X TamA= %08X\n",instruccion.OpA,instruccion.TamA);
-    //printf("OPERANDO EN SYS: %X\n",operando);
 
     modo= MV->R[EAX]& 0xFF;
-    //printf("MODO: %d\n",modo);
     celdas= MV->R[ECX]& 0xFF;
-    //printf("Cantidad de celdas: %d\n",celdas);
     size= (MV->R[ECX]>>8)& 0xFF;
-    //printf("Tamanio celda: %d\n",size);
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
-    //El 0xFF creo que esta de mas pero por las dudas.
-    pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size);
-    //printf("pos acceso maximo: %04X\n",pos_max_acceso-posmaxCODESEGMENT(*MV));
-    /*  Aca tendria que checkear si hay error de segmento en todas las posiciones de memoria a las que voy a querer acceder?
-    *   Si es asi puedo usar:
-    *   -------------------
-    *   int pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size) ???? CHECKEAR Y PREGUNTAR
-    *   -------------------
-    *   Ya que dentro de la funcion direccionamiento checkea el error de segmento.
-    *   Sino puedo hacerlo manualmente
-    *
-    */
+
+    pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size); // Para verificar fallo de segmento.
+
     if(operando==1){    //READ
         for(i=0;i<celdas;i++){
-            printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
+            printf("[%04X] ",pos_inicial_memoria);
             if(modo==0x10){
                 //lee binario como string Y LO PASA A INT.
                 numero=leer_binario_c2_32();
@@ -1150,7 +1120,6 @@ void SYS (TMV *MV, TInstruc instruccion){
             // ESTA PARTE ESTA BIEN SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4. HAY QUE PREGUNTAR Y CORREGIR CON ALGUN FOR SINO.
             if(size==1){
                 (*MV).MEM[pos_inicial_memoria++]=numero;
-                //pos_inicial_memoria+=1;
             }
             else if (size==2){
                 (*MV).MEM[pos_inicial_memoria++]=numero >> 8;
@@ -1171,7 +1140,7 @@ void SYS (TMV *MV, TInstruc instruccion){
     }
     else if (operando==2){ //WRITE.
         for (i=0;i<celdas;i++){
-            printf("[%04X] ",pos_inicial_memoria-posmaxCODESEGMENT(*MV));
+            printf("[%04X] ",pos_inicial_memoria);
             // PASA LO MISMO CON EL WRITE. SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4 ESTA BIEN, SINO HAY QUE CORREGIR CON ALGUN FOR.
             if(size==1){
                 numero=(*MV).MEM[pos_inicial_memoria++];
@@ -1221,10 +1190,14 @@ void SYS (TMV *MV, TInstruc instruccion){
             if(modo & 0x04)
                 printf("0o%o ",numero);
             if(modo & 0x02){
-                if(numero<1 || numero>255)
-                    printf(". ");
-                else
-                    printf("%c ",numero);
+                for (j=size-1;j>-1;j--){
+                    imprimible=numero>>(4*(2*j));
+                    if(imprimible<32 || imprimible>126)
+                        printf(".");
+                    else
+                        printf("%c",imprimible);
+                }
+                printf(" ");
             }
             if(modo & 0x01)
                 printf("%d ",numero);
@@ -1459,7 +1432,7 @@ void STOP(TMV *MV,TInstruc instruccion){
 
 void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
 
-    unsigned char Instruccion,CodOp;
+    unsigned char CodOp;
     int CantOp;
     TInstruc instruc;
     unsigned short int PosInicial,PosMemoria,PosFinal;
@@ -1525,7 +1498,7 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
         }
         else { //Registro
             DefinoRegistro(&SecA,&CodReg,instruc.OpA);
-            if (instruc.OpA >= 10){
+            if (CodReg >= 10){
                 strcpy(AuxSeg,VecRegistros[CodReg]);
                 GuardoSector(AuxSeg,SecA);
                 if (SecA == 0)
