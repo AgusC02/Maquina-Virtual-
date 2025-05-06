@@ -3,10 +3,67 @@
 #include <string.h>
 #include "MV.h"
 
-void inicializoTDS(TMV* MV,short int TamCS){
-  MV->TDS[CS]=TamCS;
-  MV->TDS[DS]=TamCS << 16;
-  MV->TDS[DS]+=(TMEM-TamCS);
+void initregsegmentos(TMV *MV){
+    int i;
+    for(i=1;i<IP;i++){
+        MV->R[i]=-1;
+    }
+}
+void agregasegmentos(unsigned short int tam, int reg_indx,TMV *MV, int *tds_indx, int sizeac){
+    if(tam>0){
+        MV->TDS[*tds_indx]=sizeac;
+        MV->TDS[*tds_indx]<<= 16; // quedo la base
+        MV->TDS[*tds_indx] |= (tam & 0xFFFF);
+
+        if(reg_indx>=0){
+            MV->R[reg_indx]= (*tds_indx);
+            MV->R[reg_indx] <<= 16;
+        }
+        (*tds_indx)++;
+    }
+    else if(reg_indx>=0){
+        MV->R[reg_indx]=-1;
+    }
+}
+
+void inicializoTDS(TMV* MV,theader header){
+  
+short int TamCS;
+  int indicetds=0,sizeac=0;
+
+  TamCS=header.tamCS;
+  if (header.version==1){
+        MV->mem_size=TMEM;
+        MV->TDS[CS]=TamCS;
+        MV->TDS[DS]=TamCS << 16;
+        MV->TDS[DS]+=(MV->mem_size-TamCS);
+  } else if (header.version==2){
+        // Agregue dos parametros flag en MV (mem_size y param).
+        //initregsegmentos(MV);
+        
+        agregasegmentos(MV->cantparam,-1,MV,&indicetds,sizeac);
+        sizeac+=MV->cantparam;  //esto tendria que ser el tamaño del paramsegm
+
+        agregasegmentos(header.tamKS,KS,MV,&indicetds,sizeac);
+        sizeac+=header.tamKS;
+
+        agregasegmentos(header.tamCS,CS,MV,&indicetds,sizeac);
+        sizeac+=header.tamCS;
+
+        agregasegmentos(header.tamDS,DS,MV,&indicetds,sizeac);
+        sizeac+=header.tamDS;
+    
+        agregasegmentos(header.tamES,ES,MV,&indicetds,sizeac);
+        sizeac+=header.tamES;
+
+        agregasegmentos(header.tamSS,SS,MV,&indicetds,sizeac);
+        sizeac+=header.tamSS;
+        
+        MV->R[IP]=MV->R[CS] | header.entrypointoffset;
+        if(MV->R[SS]!=-1)
+            MV->R[SP]=MV->R[SS] + header.tamSS; // Habria que checkear si existe SS primero
+
+  }
 }
 
 void inicializoRegistros(TMV *MV){
@@ -14,25 +71,34 @@ void inicializoRegistros(TMV *MV){
   MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
   MV->R[IP]=MV->R[CS]; //IP
 }
-
+/*
 void inicializoErrores(TMV *MV){
   MV->Errores[0]=0;
   MV->Errores[1]=0;
   MV->Errores[2]=0;
 }
+*/
+void initheadervmx(theader *head){
+    (*head).tamCS=-1;
+    (*head).tamDS=-1;
+    (*head).tamES=-1;
+    (*head).tamSS=-1;
+    (*head).tamKS=-1;
+    (*head).entrypointoffset=-1;
+}
 
 void generaerror(int tipo){
-    if(tipo==0)
+    if(tipo==ERRDIV0)
         printf("ERROR DIVISION POR 0");
-    if(tipo==1)
+    if(tipo==ERRINVINST)
         printf("ERROR INSTRUCCION INVALIDA");
-    if(tipo==2)
+    if(tipo==ERRSEGMF)
         printf("ERROR FALLO DE SEGMENTO");
-    if(tipo==3)
+    if(tipo==ERRMEM)
         printf("MEMORIA INSUFICIENTE");
-    if(tipo==4)
+    if(tipo==ERRSTOVF)
         printf("STACK OVERFLOW");
-    if(tipo==5)
+    if(tipo==ERRSTUNF)
         printf("STACK UNDERFLOW");
     abort();
 }
@@ -129,6 +195,8 @@ void LeoArch(char nomarch[],TMV *MV){
   unsigned char leo;
   theader header;
   int i=0;
+  //Inicializa header para lectura de datos (los tamaños de segmentos en -1)
+  initheadervmx(&header);
   //DEBO PREPARAR ARCHIVO PARA LECTURA
   arch = fopen(nomarch,"rb");
   fread(&header.c1,sizeof(char),1,arch);
@@ -137,27 +205,54 @@ void LeoArch(char nomarch[],TMV *MV){
   fread(&header.c4,sizeof(char),1,arch);
   fread(&header.c5,sizeof(char),1,arch);
   fread(&header.version,sizeof(char),1,arch);
-
   fread(&leo,sizeof(char),1,arch);
-  header.tam=leo;
-  header.tam=header.tam<<8;
+  header.tamCS=leo;
+  header.tamCS=header.tamCS<<8;
   fread(&leo,sizeof(char),1,arch);
-  header.tam+=leo;
-
-
+  header.tamCS+=leo;
 
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
-    if (header.version == 1){
-        inicializoTDS(MV,header.tam);
-        inicializoRegistros(MV);
-        inicializoErrores(MV);
-        //CARGAR EL CODIGO EN LA MEMORIA DE LA MV
-        while(!feof(arch)){
-            fread(&(MV->MEM[i]),1,1,arch);
-            i++;
-        }
+    if (header.version==1){
+    inicializoTDS(MV,header);
+    inicializoRegistros(MV);
+    inicializoErrores(MV);
+    while(!feof(arch)){
+        fread(&(MV->MEM[i]),1,1,arch);
+        i++;
     }
     }
+    else if (header.version==2){
+        fread(&leo,sizeof(char),1,arch);
+        header.tamDS=leo;
+        header.tamDS=header.tamDS<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.tamDS+=leo;
+
+        fread(&leo,sizeof(char),1,arch);
+        header.tamES=leo;
+        header.tamES=header.tamES<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.tamES+=leo;
+
+        fread(&leo,sizeof(char),1,arch);
+        header.tamSS=leo;
+        header.tamSS=header.tamSS<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.tamSS+=leo;
+
+        fread(&leo,sizeof(char),1,arch);
+        header.tamKS=leo;
+        header.tamKS=header.tamKS<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.tamKS+=leo;
+
+        fread(&leo,sizeof(char),1,arch);
+        header.entrypointoffset=leo;
+        header.entrypointoffset=header.entrypointoffset<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.entrypointoffset+=leo;
+    }
+    }else {} // ENTRA CON UN ARCHIVO DE IMAGEN.
    fclose(arch);
   }
 
@@ -176,7 +271,7 @@ int direccionamiento_logtofis(TMV MV, int puntero){
 
 
     if (!( (DirBase <= DirFisica ) && (DirFisica <= LimiteSup  ) )){ // FALTA EL +4 EN DIR FISICA SI ES MEMORIA
-        generaerror(2);
+        generaerror(ERRSEGMF);
         return -1;        // Aca nunca va a llegar si llama a generaerror, porque la ultima instruccion de la funcion es abort().
     }
     else
@@ -221,7 +316,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
             MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
         }else
-            generaerror(1);
+            generaerror(ERRINVINST);
     }
 }
 
@@ -589,7 +684,7 @@ void DIV(TMV * MV,TInstruc instruc){
     guardoOpB(*MV,instruc,&divisor);
 
     if (divisor == 0)
-        generaerror(0);
+        generaerror(ERRDIV0);
     else{
        //OPA
        int Dividendo;
@@ -1205,7 +1300,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         }
     }
     else
-        generaerror(1); //ESTO NO SE SI SE HACE PERO BUENO.
+        generaerror(ERRINVINST); //ESTO NO SE SI SE HACE PERO BUENO.
 }
 
 void JMP (TMV *MV,TInstruc instruccion){
@@ -1227,7 +1322,7 @@ void JMP (TMV *MV,TInstruc instruccion){
 
     // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
     if (sobrepasaCS(*MV,asignable)==1)
-        generaerror(2);
+        generaerror(ERRSEGMF);
 
     MV->R[IP]=asignable;
 
@@ -1252,7 +1347,7 @@ void JZ (TMV *MV,TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1276,7 +1371,7 @@ void JP (TMV *MV,TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1300,7 +1395,7 @@ void JN (TMV *MV,TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1324,7 +1419,7 @@ void JNZ (TMV *MV,TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1348,7 +1443,7 @@ void JNP (TMV *MV, TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1372,7 +1467,7 @@ void JNN (TMV *MV, TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
