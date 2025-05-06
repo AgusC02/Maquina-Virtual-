@@ -812,7 +812,7 @@ void XOR(TMV * MV,TInstruc instruc){
     }
      else{
         int AuxResXOR;
-        AuxResXOR = LeoEnMemoria(*MV,instruc.OpA) & auxXOR;
+        AuxResXOR = LeoEnMemoria(*MV,instruc.OpA) ^ auxXOR;
         modificoCC(MV,AuxResXOR);
         EscriboEnMemoria(MV,instruc.OpA,AuxResXOR);
     }
@@ -1071,8 +1071,8 @@ void SYS (TMV *MV, TInstruc instruccion){
     El modo de escritura depende de la configuracion almacenada en AL.
 
 */
-    int i,operando,pos_inicial_memoria,numero,pos_max_acceso;
-    char modo,celdas,size;
+    int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso;
+    char modo,celdas,size,imprimible;
     char *bin;
     unsigned char Sec,Codreg;
 
@@ -1097,7 +1097,7 @@ void SYS (TMV *MV, TInstruc instruccion){
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
 
     pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size); // Para verificar fallo de segmento.
-   
+
     if(operando==1){    //READ
         for(i=0;i<celdas;i++){
             printf("[%04X] ",pos_inicial_memoria);
@@ -1190,10 +1190,14 @@ void SYS (TMV *MV, TInstruc instruccion){
             if(modo & 0x04)
                 printf("0o%o ",numero);
             if(modo & 0x02){
-                if(numero<32 || numero>126)
-                    printf(". ");
-                else
-                    printf("%c ",numero);
+                for (j=size-1;j>-1;j--){
+                    imprimible=numero>>(4*(2*j));
+                    if(imprimible<32 || imprimible>126)
+                        printf(".");
+                    else
+                        printf("%c",imprimible);
+                }
+                printf(" ");
             }
             if(modo & 0x01)
                 printf("%d ",numero);
