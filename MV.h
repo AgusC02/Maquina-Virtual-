@@ -52,7 +52,8 @@ typedef struct TMV{
   int R[CANTREG]; //Registros
   int TDS[TDDSSIZE]; //Segmentos
   int mem_size;
-  int cantparam;
+  int size_paramsegment;
+  char disassembler;
 }TMV;
 
 typedef struct TInstruc{

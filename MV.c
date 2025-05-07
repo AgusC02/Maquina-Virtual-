@@ -3,6 +3,80 @@
 #include <string.h>
 #include "MV.h"
 
+void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
+/*
+    ESTA FUNCION TIENE QUE ARMAR EL PARAM SEGMENT Y
+    CALCULAR SU TAMAÑO EN BYTES Y DEVOLVERLO EN *paramsize para setear la MV
+    [EN PROCESO]
+
+    El segmento esta compuesto por los strings parametros y al final
+    un arreglo argv de tamaño argc de punteros de 4 bytes
+
+    Precondicion: argc>0 por lo tanto argv!=NULL
+    Postcondicion: Deja armado el paramsegment de la MV,
+                     y devuelve el tamaño en bytes del segmento en *paramsize
+*/
+    int i,sizestr=0,tam=0;
+
+    for (i=0;i<argc;i++){
+        sizestr+=strlen(argv[i])+1;
+        
+
+        tam+=sizestr;
+    }
+    
+    tam+= argc*4;
+    *paramsize=tam;
+}
+
+void dep_arg(int argc, char *argv[], TMV *MV){
+    /*
+    * Funcion para depurar los argumentos e inicializar la maquina virtual
+    */
+   int tammem=16;
+   int cant_params=0;
+   char vmx,vmi,disassembler=0;
+   int argindx;
+   char *archivo_vmx= NULL;
+   char *archivo_vmi= NULL;
+   char **vectorparams = NULL;
+   int paramsize=0;
+
+    for (argindx=1; argindx<argc;argindx++){
+        
+        if(strncmp(argv[argindx],"m=",2)==0){ // Checkea m=M
+            tammem=atoi(argv[argindx]+2);
+        }
+        else if (strcmp(argv[argindx],"-d")==0){ // Checkea disassembler
+            disassembler=1;
+        }
+        else if (archivo_vmx == NULL && strstr(argv[argindx],".vmx")){ //Checkea .vmx
+            vmx=1;
+            archivo_vmx= malloc(strlen(argv[argindx])+1);
+            strcpy(archivo_vmx,argv[argindx]);
+        }
+        else if (archivo_vmi == NULL && strstr(argv[argindx],".vmi")){ //Checkea .vmi
+            vmi=1;
+            archivo_vmi= malloc(strlen(argv[argindx])+1);
+            strcpy(archivo_vmi,argv[argindx]);
+        }
+        else if(vmx==1 && strcmp(argv[argindx],"-p")==0){ //Checkea -p
+            // lo que viene despues son los parametros
+            cant_params= argc-argindx-1;
+            vectorparams=&argv[argindx+1];
+            
+            //vectorparams apunta al primer parametro y cant_params tiene la cantidad.
+            if(cant_params>0)
+                armaParamSegment(MV,cant_params,vectorparams,&paramsize);
+        }
+        
+
+    }
+
+    MV->size_paramsegment=paramsize;
+    MV->mem_size=tammem*1024;
+    MV->disassembler=disassembler;
+}
 void initregsegmentos(TMV *MV){
     int i;
     for(i=1;i<IP;i++){
@@ -27,7 +101,6 @@ void agregasegmentos(unsigned short int tam, int reg_indx,TMV *MV, int *tds_indx
 }
 
 void inicializoTDS(TMV* MV,theader header){
-  
 short int TamCS;
   int indicetds=0,sizeac=0;
 
@@ -39,10 +112,10 @@ short int TamCS;
         MV->TDS[DS]+=(MV->mem_size-TamCS);
   } else if (header.version==2){
         // Agregue dos parametros flag en MV (mem_size y param).
-        //initregsegmentos(MV);
+        initregsegmentos(MV);
         
-        agregasegmentos(MV->cantparam,-1,MV,&indicetds,sizeac);
-        sizeac+=MV->cantparam;  //esto tendria que ser el tamaño del paramsegm
+        agregasegmentos(MV->size_paramsegment,-1,MV,&indicetds,sizeac);
+        sizeac+=MV->size_paramsegment;  //esto tendria que ser el tamaño del paramsegm
 
         agregasegmentos(header.tamKS,KS,MV,&indicetds,sizeac);
         sizeac+=header.tamKS;
@@ -58,11 +131,13 @@ short int TamCS;
 
         agregasegmentos(header.tamSS,SS,MV,&indicetds,sizeac);
         sizeac+=header.tamSS;
-        
+
+        if (sizeac>MV->mem_size)
+            generaerror(ERRMEM);
+
         MV->R[IP]=MV->R[CS] | header.entrypointoffset;
         if(MV->R[SS]!=-1)
             MV->R[SP]=MV->R[SS] + header.tamSS; // Habria que checkear si existe SS primero
-
   }
 }
 
