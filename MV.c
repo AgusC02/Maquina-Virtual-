@@ -3,6 +3,16 @@
 #include <string.h>
 #include "MV.h"
 
+void iniciasubrutina(TMV *MV){
+
+}
+
+void initparametrosMV(TMV *MV){
+    MV->size_paramsegment=0;
+    MV->disassembler=0;
+    MV->argc=0;
+    MV->punteroargv=-1;
+}
 void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
 /*
     ESTA FUNCION TIENE QUE ARMAR EL PARAM SEGMENT Y
@@ -34,12 +44,20 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
         free(auxiliar);
     }
     //Despues de este for ya tenemos los strings copiados
+    //Defino el puntero a argv que le voy a pasar a la maquina virtual para armar la subrutina principal.
+    //Este es el indice porque la posicion del paramsegment es 0 en el tds
+    // y el memindx es el offset. Para integrarlo mejor en otro momento habria que buscar otra forma.
+    // por ahora va a quedar asi.
+    MV->punteroargv=memindx;
+    //-----------------------
+
     for(i=0;i<argc;i++){
         for(j=3;j>0;j--){
             MV->MEM[memindx++]= (vectorindices[i] >> (8*j));
         }
     }
     //Despues de este doble for ya tenemos el arreglo de argumentos cargado.
+    MV->argc=argc;
     tam+= argc*4;
     *paramsize=tam;
 }
@@ -56,6 +74,8 @@ void dep_arg(int argc, char *argv[], TMV *MV){
    char *archivo_vmi= NULL;
    char **vectorparams = NULL;
    int paramsize=0;
+    
+   initparametrosMV(MV);
 
     for (argindx=1; argindx<argc;argindx++){
         
@@ -84,14 +104,14 @@ void dep_arg(int argc, char *argv[], TMV *MV){
             if(cant_params>0)
                 armaParamSegment(MV,cant_params,vectorparams,&paramsize);
         }
-        
-
     }
-
     MV->size_paramsegment=paramsize;
     MV->mem_size=tammem*1024;
     MV->disassembler=disassembler;
+
+
 }
+
 void initregsegmentos(TMV *MV){
     int i;
     for(i=1;i<IP;i++){
@@ -161,13 +181,7 @@ void inicializoRegistros(TMV *MV){
   MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
   MV->R[IP]=MV->R[CS]; //IP
 }
-/*
-void inicializoErrores(TMV *MV){
-  MV->Errores[0]=0;
-  MV->Errores[1]=0;
-  MV->Errores[2]=0;
-}
-*/
+
 void initheadervmx(theader *head){
     (*head).tamCS=-1;
     (*head).tamDS=-1;
@@ -284,6 +298,11 @@ void LeoArch(char nomarch[],TMV *MV){
   FILE *arch;
   unsigned char leo;
   theader header;
+  theadervmi headervmi;
+  int vecvmi_reg[16];
+  int vecvmi_tds[8];
+  int vecvmi_mem[TMEM];
+  int regvmi,tdsvmi,memvmi;
   int i=0;
   //Inicializa header para lectura de datos (los tamaños de segmentos en -1)
   initheadervmx(&header);
@@ -305,7 +324,7 @@ void LeoArch(char nomarch[],TMV *MV){
     if (header.version==1){
     inicializoTDS(MV,header);
     inicializoRegistros(MV);
-    inicializoErrores(MV);
+
     while(!feof(arch)){
         fread(&(MV->MEM[i]),1,1,arch);
         i++;
@@ -341,8 +360,19 @@ void LeoArch(char nomarch[],TMV *MV){
         header.entrypointoffset=header.entrypointoffset<<8;
         fread(&leo,sizeof(char),1,arch);
         header.entrypointoffset+=leo;
+
+        
     }
-    }else {} // ENTRA CON UN ARCHIVO DE IMAGEN.
+    }else if (header.c1=='V' && header.c2 =='M' && header.c3=='I' && header.c4=='2' && header.c5=='5'){
+        // ENTRA CON UN ARCHIVO DE IMAGEN.
+        headervmi.carV=header.c1;
+        headervmi.carM=header.c2;
+        headervmi.carI=header.c3;
+        headervmi.car2=header.c4;
+        headervmi.car5=header.c5;
+        headervmi.mem_size=header.tamCS;
+
+    } 
    fclose(arch);
   }
 

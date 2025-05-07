@@ -53,6 +53,8 @@ typedef struct TMV{
   int TDS[TDDSSIZE]; //Segmentos
   int mem_size;
   int size_paramsegment;
+  int argc;
+  int punteroargv;
   char disassembler;
 }TMV;
 
@@ -64,6 +66,9 @@ typedef struct TInstruc{
 
 typedef void (*TFunc[CANTFUNC])(TMV *mv,TInstruc instruc); //Array de punteros a funciones
 
+void initparametrosMV(TMV *MV);
+void armaParamSegment(TMV *MV,int argc,char *argv[],int *paramsize);
+void dep_arg
 void initregsegmentos(TMV *MV);
 void agregasegmentos(unsigned short int tam, int reg_indx,TMV *MV, int *tds_indx, int sizeac);
 void inicializoTDS(TMV* MV,theader header);
