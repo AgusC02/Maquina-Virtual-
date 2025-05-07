@@ -16,15 +16,30 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     Postcondicion: Deja armado el paramsegment de la MV,
                      y devuelve el tamaño en bytes del segmento en *paramsize
 */
-    int i,sizestr=0,tam=0;
-
+    int i,j,memindx,sizestr=0,tam=0;
+    int vectorindices[100];
+    char *auxiliar;
+    memindx=0;
     for (i=0;i<argc;i++){
         sizestr+=strlen(argv[i])+1;
+        auxiliar=malloc(sizestr);
+        strcpy(auxiliar,argv[i]);
         
+        vectorindices[i]=memindx;
+        for(j=0;j<sizestr;j++){
+            MV->MEM[memindx++]=auxiliar[j];
+        }
 
         tam+=sizestr;
+        free(auxiliar);
     }
-    
+    //Despues de este for ya tenemos los strings copiados
+    for(i=0;i<argc;i++){
+        for(j=3;j>0;j--){
+            MV->MEM[memindx++]= (vectorindices[i] >> (8*j));
+        }
+    }
+    //Despues de este doble for ya tenemos el arreglo de argumentos cargado.
     tam+= argc*4;
     *paramsize=tam;
 }
