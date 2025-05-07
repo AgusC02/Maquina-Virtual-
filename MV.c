@@ -7,6 +7,35 @@ void iniciasubrutina(TMV *MV){
 
 }
 
+void init_mem0(TMV *MV){
+    int i;
+    for (i=0;i<TMEM;i++){
+        MV->MEM[i]=0;
+    }
+}
+
+void init_reg0(TMV *MV){
+    int i;
+    for (i=0;i<CANTREG;i++){
+        MV->R[i]=0;
+    }
+}
+
+void init_tds0(TMV *MV){
+    int i;
+    for (i=0;i<CANTMAXSEGMENTOS;i++){
+        MV->TDS[i]=0;
+    }
+}
+
+void inicializoMVen0(TMV *MV){
+    int i;
+    
+    init_mem0(MV);
+    init_reg0(MV);
+    init_tds0(MV);
+    
+}
 void initparametrosMV(TMV *MV){
     MV->size_paramsegment=0;
     MV->disassembler=0;
@@ -70,8 +99,9 @@ void dep_arg(int argc, char *argv[], TMV *MV){
    int cant_params=0;
    char vmx,vmi,disassembler=0;
    int argindx;
-   char *archivo_vmx= NULL;
-   char *archivo_vmi= NULL;
+   char *archivo_vmx = NULL;
+   char *archivo_vmi = NULL;
+   char archivo[50];
    char **vectorparams = NULL;
    int paramsize=0;
     
@@ -109,6 +139,17 @@ void dep_arg(int argc, char *argv[], TMV *MV){
     MV->mem_size=tammem*1024;
     MV->disassembler=disassembler;
 
+    if(vmx){
+        if(archivo_vmx!=NULL){
+            strcpy(archivo,archivo_vmx);
+        }
+    }
+    else if (vmi){
+        if(archivo_vmi!=NULL){
+            strcpy(archivo,archivo_vmi);
+        }
+    }
+    LeoArch(archivo,MV);
 
 }
 
@@ -303,7 +344,7 @@ void LeoArch(char nomarch[],TMV *MV){
   int vecvmi_tds[8];
   int vecvmi_mem[TMEM];
   int regvmi,tdsvmi,memvmi;
-  int i=0;
+  int j,i=0;
   //Inicializa header para lectura de datos (los tamaños de segmentos en -1)
   initheadervmx(&header);
   //DEBO PREPARAR ARCHIVO PARA LECTURA
@@ -371,7 +412,30 @@ void LeoArch(char nomarch[],TMV *MV){
         headervmi.car2=header.c4;
         headervmi.car5=header.c5;
         headervmi.mem_size=header.tamCS;
+        //SI ENTRO ACA ES PORQUE TENGO Q BASARME EN LA IMAGEN
+        inicializoMVen0(MV);
+        MV->mem_size=headervmi.mem_size;
+        for(i=0;i<CANTREG;i++){ //LEO LOS REGISTROS
+            for(j=0;j<4;j++){
+                fread(&leo,sizeof(char),1,arch);
+                MV->R[i]<<=4;
+                MV->R[i]|=leo;
+            }
+        }
 
+        for(i=0;i<CANTMAXSEGMENTOS;i++){
+            for(j=0;j<4;j++){
+                fread(&leo,sizeof(char),1,arch);
+                MV->TDS[i] <<= 4;
+                MV->TDS[i] |= leo;
+            }
+        }
+
+        for(i=0;i<MV->mem_size;i++){
+            fread(&leo,sizeof(char),1,arch);
+            MV->MEM[i]=leo;
+        }
+        //MAQUINA VIRTUAL SETEADA COMO LA IMAGEN.
     } 
    fclose(arch);
   }

@@ -66,9 +66,13 @@ typedef struct TInstruc{
 
 typedef void (*TFunc[CANTFUNC])(TMV *mv,TInstruc instruc); //Array de punteros a funciones
 
+void init_mem0(TMV *MV);
+void init_reg0(TMV *MV);
+void init_tds0(TMV *MV);
+void inicializoMVen0(TMV *MV);
 void initparametrosMV(TMV *MV);
 void armaParamSegment(TMV *MV,int argc,char *argv[],int *paramsize);
-void dep_arg
+void dep_arg(int argc,char *argv[],TMV *MV);
 void initregsegmentos(TMV *MV);
 void agregasegmentos(unsigned short int tam, int reg_indx,TMV *MV, int *tds_indx, int sizeac);
 void inicializoTDS(TMV* MV,theader header);
