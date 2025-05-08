@@ -6,7 +6,7 @@
 void iniciasubrutina(TMV *MV){
     int posicionfisicaSS;
     // Habria que preguntar que pasa si se define el stack segment como 0, que pasaria con la subrutina principal.
-    posicionfisicaSS=direccionamiento_logtofis(MV->R[SS]);
+    posicionfisicaSS=direccionamiento_logtofis(*MV,(*MV).R[SS]);
     
     // Posicionfisica SS apunta a la ultima direccion posible de memoria
     MV->MEM[posicionfisicaSS]=MV->punteroargv;
@@ -1500,6 +1500,25 @@ void SYS (TMV *MV, TInstruc instruccion){
                 printf("%d ",numero);
             printf("\n");
         }
+    }else if (operando == 3){
+        //Codear SYS 3 STRING READ
+        /*
+        almacena en un rango de celdas de memoria los datos leídos desde el teclado.
+        Almacena lo que se lee en la posición de memoria apuntada por EDX. En CX (16 bits) se especifica la
+        cantidad máxima de caracteres a leer. Si CX tiene -1 no se limita la cantidad de caracteres a leer.
+
+        */
+    }
+    else if(operando == 4){
+        //Codear SYS 4 STRING WRITE
+        /*
+        imprime por pantalla un rango de celdas donde se encuentra un string. Inicia en la
+        posición de memoria apuntada por EDX, e imprime hasta encontrar un '\0' (0x00).
+
+        */
+    }
+    else if(operando==7){
+        clearscreen();
     }
     else
         generaerror(ERRINVINST); //ESTO NO SE SI SE HACE PERO BUENO.
@@ -1846,4 +1865,15 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
         strcat(Segmento,"H");
     else
         strcat(Segmento,"X");
+}
+
+void clearscreen() {
+    #ifdef _WIN32
+        system("cls");
+    #elif defined(__linux__) || defined(__APPLE__)
+        system("clear");
+    #else
+        // No se reconoce el sistema operativo
+        printf("No se puede limpiar la pantalla en este sistema.\n");
+    #endif
 }
