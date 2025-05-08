@@ -142,9 +142,10 @@ void dep_arg(int argc, char *argv[], TMV *MV){
     if(vmx){
         if(archivo_vmx!=NULL){
             strcpy(archivo,archivo_vmx);
+            iniciasubrutina(MV);
         }
     }
-    else if (vmi){
+    else if (vmi && !vmx){
         if(archivo_vmi!=NULL){
             strcpy(archivo,archivo_vmi);
         }
@@ -211,16 +212,23 @@ short int TamCS;
         if (sizeac>MV->mem_size)
             generaerror(ERRMEM);
 
-        MV->R[IP]=MV->R[CS] | header.entrypointoffset;
+        MV->R[IP]=(MV->R[CS] & 0xFFFF0000) | header.entrypointoffset;
         if(MV->R[SS]!=-1)
             MV->R[SP]=MV->R[SS] + header.tamSS; // Habria que checkear si existe SS primero
   }
 }
 
-void inicializoRegistros(TMV *MV){
-  MV->R[CS]=0X00000000;
-  MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
-  MV->R[IP]=MV->R[CS]; //IP
+void inicializoRegistros(TMV *MV,theader header){
+  
+    if (header.version==1){
+        MV->R[CS]=0X00000000;
+        MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
+        MV->R[IP]=MV->R[CS]; //IP
+    }
+    else{
+        
+    }
+  
 }
 
 void initheadervmx(theader *head){
@@ -364,7 +372,7 @@ void LeoArch(char nomarch[],TMV *MV){
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
     if (header.version==1){
     inicializoTDS(MV,header);
-    inicializoRegistros(MV);
+    inicializoRegistros(MV,header);
 
     while(!feof(arch)){
         fread(&(MV->MEM[i]),1,1,arch);
@@ -401,6 +409,9 @@ void LeoArch(char nomarch[],TMV *MV){
         header.entrypointoffset=header.entrypointoffset<<8;
         fread(&leo,sizeof(char),1,arch);
         header.entrypointoffset+=leo;
+
+        iniciasubrutina(MV);
+        inicializoTDS(MV,header);
 
         
     }
