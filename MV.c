@@ -4,6 +4,17 @@
 #include "MV.h"
 
 void iniciasubrutina(TMV *MV){
+    int posicionfisicaSS;
+    // Habria que preguntar que pasa si se define el stack segment como 0, que pasaria con la subrutina principal.
+    posicionfisicaSS=direccionamiento_logtofis(MV->R[SS]);
+    
+    // Posicionfisica SS apunta a la ultima direccion posible de memoria
+    MV->MEM[posicionfisicaSS]=MV->punteroargv;
+    posicionfisicaSS--;
+    MV->MEM[posicionfisicaSS]=MV->argc;
+    posicionfisicaSS--;
+    MV->MEM[posicionfisicaSS]=0xFFFFFFFF;
+    MV->R[SP]=posicionfisicaSS;
 
 }
 
@@ -142,7 +153,6 @@ void dep_arg(int argc, char *argv[], TMV *MV){
     if(vmx){
         if(archivo_vmx!=NULL){
             strcpy(archivo,archivo_vmx);
-            iniciasubrutina(MV);
         }
     }
     else if (vmi && !vmx){
@@ -215,6 +225,7 @@ short int TamCS;
         MV->R[IP]=(MV->R[CS] & 0xFFFF0000) | header.entrypointoffset;
         if(MV->R[SS]!=-1)
             MV->R[SP]=MV->R[SS] + header.tamSS; // Habria que checkear si existe SS primero
+        iniciasubrutina(MV); // Puede estar dentro del if de arriba creo.
   }
 }
 
@@ -224,11 +235,7 @@ void inicializoRegistros(TMV *MV,theader header){
         MV->R[CS]=0X00000000;
         MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
         MV->R[IP]=MV->R[CS]; //IP
-    }
-    else{
-        
-    }
-  
+    }  
 }
 
 void initheadervmx(theader *head){
@@ -410,7 +417,7 @@ void LeoArch(char nomarch[],TMV *MV){
         fread(&leo,sizeof(char),1,arch);
         header.entrypointoffset+=leo;
 
-        iniciasubrutina(MV);
+        
         inicializoTDS(MV,header);
 
         
