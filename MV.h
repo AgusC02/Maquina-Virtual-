@@ -55,8 +55,9 @@ typedef struct TMV{
   int size_paramsegment;
   int argc;
   int punteroargv;
-  char archivovmi[50];
+  char *archivovmi;
   char disassembler;
+  char flagdebug;
 }TMV;
 
 typedef struct TInstruc{
@@ -67,6 +68,9 @@ typedef struct TInstruc{
 
 typedef void (*TFunc[CANTFUNC])(TMV *mv,TInstruc instruc); //Array de punteros a funciones
 
+void iniciasubrutina(TMV *MV);
+void mododebug(TMV *MV);
+void generarImagen(TMV MV);
 void init_mem0(TMV *MV);
 void init_reg0(TMV *MV);
 void init_tds0(TMV *MV);
@@ -77,7 +81,7 @@ void dep_arg(int argc,char *argv[],TMV *MV);
 void initregsegmentos(TMV *MV);
 void agregasegmentos(unsigned short int tam, int reg_indx,TMV *MV, int *tds_indx, int sizeac);
 void inicializoTDS(TMV* MV,theader header);
-void inicializoRegistros(TMV *MV);
+void inicializoRegistros(TMV *MV,theader header);
 void inicializoErrores(TMV *MV);
 void initheadervmx(theader *head);
 void generaerror(int tipo);
@@ -171,5 +175,5 @@ void STOP(TMV * MV,TInstruc instruc);
 void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
 void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc,unsigned short int PosInicial,unsigned short int PosMemoria);
 void GuardoSector(char Segmento[4],unsigned char Sec);
-
+void clearscreen();
 #endif // MV_H_INCLUDED

@@ -31,6 +31,7 @@ int main(int argc, char *argv[]){
     LeoInstruccion(&MV);
     //PARA DEBUGEAR
     //muestravaloresmv(MV);
+    free(MV.archivovmi);
 
 return 0;
 }

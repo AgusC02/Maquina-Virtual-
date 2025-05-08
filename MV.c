@@ -6,7 +6,7 @@
 void iniciasubrutina(TMV *MV){
     int posicionfisicaSS;
     // Habria que preguntar que pasa si se define el stack segment como 0, que pasaria con la subrutina principal.
-    posicionfisicaSS=direccionamiento_logtofis(MV->R[SS]);
+    posicionfisicaSS=direccionamiento_logtofis(*MV,(*MV).R[SS]);
     
     // Posicionfisica SS apunta a la ultima direccion posible de memoria
     MV->MEM[posicionfisicaSS]=MV->punteroargv;
@@ -16,6 +16,62 @@ void iniciasubrutina(TMV *MV){
     MV->MEM[posicionfisicaSS]=0xFFFFFFFF;
     MV->R[SP]=posicionfisicaSS;
 
+}
+
+void mododebug(TMV *MV){
+    char comando;
+
+    comando = getchar();
+    while (getchar() != '\n'); // limpiar buffer
+
+    if (comando == 'q') {
+        exit(0);
+    } else if (comando == 'g') {
+        MV->flagdebug = 0;  //  SE DESACTIVA EL MODO DEBUG
+    }
+    // Si es enter, se sigue paso a paso sin tocar el flag
+}
+
+void generarImagen(TMV MV){
+    theadervmi header;
+    int i=0;
+    FILE *f;
+    unsigned char mem_kib;
+    unsigned int reg;
+
+    f=fopen(MV.archivovmi,"wb");
+    
+    if(!f){
+        printf("ERROR AL ABRIR ARCHIVO DE IMAGEN \n");
+        exit(1);
+    }
+
+    fwrite("VMI25",1,5,f);
+    fputc(1,f);
+    mem_kib=MV.mem_size/1024;
+    fputc((mem_kib>>8)&0xFF,f);
+    fputc(mem_kib & 0xFF,f);
+
+     // Registros (64 bytes)
+    for(i=0;i<CANTREG;i++){
+        reg=MV.R[i];
+        fputc((reg>>24)&0xFF, f);
+        fputc((reg>>16)&0xFF, f);
+        fputc((reg>>8)&0xFF, f);
+        fputc((reg)&0xFF, f);
+    }
+
+    // TDS (32 bytes)
+    for (i=0;i<CANTMAXSEGMENTOS;i++){
+        reg=MV.TDS[i];
+        fputc((reg>>24)&0xFF, f);
+        fputc((reg>>16)&0xFF, f);
+        fputc((reg>>8)&0xFF, f);
+        fputc((reg)&0xFF, f);
+    }
+    // MEMORIA (variable)
+    fwrite(MV.MEM,1,MV.mem_size,f);
+    fclose(f);
 }
 
 void init_mem0(TMV *MV){
@@ -48,10 +104,15 @@ void inicializoMVen0(TMV *MV){
     
 }
 void initparametrosMV(TMV *MV){
+    /*
+    ESTA FUNCION SOLO DEBE SER LLAMADA POR DEP_ARG, 
+    */
     MV->size_paramsegment=0;
     MV->disassembler=0;
     MV->argc=0;
     MV->punteroargv=-1;
+    MV->archivovmi=NULL;
+    MV->flagdebug=0;
 }
 void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
 /*
@@ -155,14 +216,19 @@ void dep_arg(int argc, char *argv[], TMV *MV){
             strcpy(archivo,archivo_vmx);
         }
         if(vmi){
+            MV->archivovmi=malloc(sizeof(strlen(archivo_vmi)+1));
             strcpy(MV->archivovmi,archivo_vmi);
         }
     }
     else if (vmi && !vmx){
         if(archivo_vmi!=NULL){
             strcpy(archivo,archivo_vmi);
+            MV->archivovmi=malloc(sizeof(strlen(archivo_vmi)+1));
+            strcpy(MV->archivovmi,archivo_vmi);
         }
     }
+    free(archivo_vmi);
+    free(archivo_vmx);
     LeoArch(archivo,MV);
 
 }
@@ -242,11 +308,11 @@ void inicializoRegistros(TMV *MV,theader header){
 }
 
 void initheadervmx(theader *head){
-    (*head).tamCS=-1;
-    (*head).tamDS=-1;
-    (*head).tamES=-1;
-    (*head).tamSS=-1;
-    (*head).tamKS=-1;
+    (*head).tamCS=0;
+    (*head).tamDS=0;
+    (*head).tamES=0;
+    (*head).tamSS=0;
+    (*head).tamKS=0;
     (*head).entrypointoffset=-1;
 }
 
@@ -499,7 +565,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
     TInstruc instruc;
     TFunc Funciones;
     int DirFisicaActual;
-
+  
     declaroFunciones(Funciones);
 
     finCS=posmaxCODESEGMENT(*MV);
@@ -519,6 +585,10 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
             Funciones[CodOp](MV,instruc);
         }else
             generaerror(ERRINVINST);
+        if (MV->flagdebug && (MV->archivovmi != NULL)) {
+                generarImagen(*MV);
+                modoDebug(MV);
+        }
     }
 }
 
@@ -1500,6 +1570,28 @@ void SYS (TMV *MV, TInstruc instruccion){
                 printf("%d ",numero);
             printf("\n");
         }
+    }else if (operando == 3){
+        /*
+        almacena en un rango de celdas de memoria los datos leídos desde el teclado.
+        Almacena lo que se lee en la posición de memoria apuntada por EDX. En CX (16 bits) se especifica la
+        cantidad máxima de caracteres a leer. Si CX tiene -1 no se limita la cantidad de caracteres a leer.
+
+        */
+    }
+    else if(operando == 4){
+        /*
+        imprime por pantalla un rango de celdas donde se encuentra un string. Inicia en la
+        posición de memoria apuntada por EDX, e imprime hasta encontrar un '\0' (0x00).
+
+        */
+    }
+    else if(operando==7){
+        clearscreen();
+    }
+    else if(operando==0xF){
+        if(MV->archivovmi != NULL){
+            MV->flagdebug=1;
+        }
     }
     else
         generaerror(ERRINVINST); //ESTO NO SE SI SE HACE PERO BUENO.
@@ -1846,4 +1938,15 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
         strcat(Segmento,"H");
     else
         strcat(Segmento,"X");
+}
+
+void clearscreen() {
+    #ifdef _WIN32
+        system("cls");
+    #elif defined(__linux__) || defined(__APPLE__)
+        system("clear");
+    #else
+        // No se reconoce el sistema operativo
+        printf("No se puede limpiar la pantalla en este sistema.\n");
+    #endif
 }
