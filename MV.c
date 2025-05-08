@@ -6,7 +6,7 @@
 void iniciasubrutina(TMV *MV){
     int posicionfisicaSS;
     // Habria que preguntar que pasa si se define el stack segment como 0, que pasaria con la subrutina principal.
-    posicionfisicaSS=direccionamiento_logtofis(MV->R[SS]);
+    posicionfisicaSS=direccionamiento_logtofis(*MV,(*MV).R[SS]);
     
     // Posicionfisica SS apunta a la ultima direccion posible de memoria
     MV->MEM[posicionfisicaSS]=MV->punteroargv;
@@ -1500,6 +1500,14 @@ void SYS (TMV *MV, TInstruc instruccion){
                 printf("%d ",numero);
             printf("\n");
         }
+    }else if (operando == 3){
+
+    }
+    else if(operando == 4){
+
+    }
+    else if(operando==7){
+        clearsc
     }
     else
         generaerror(ERRINVINST); //ESTO NO SE SI SE HACE PERO BUENO.
@@ -1846,4 +1854,15 @@ void GuardoSector(char Segmento[4],unsigned char Sec){
         strcat(Segmento,"H");
     else
         strcat(Segmento,"X");
+}
+
+void clearscreen() {
+    #ifdef _WIN32
+        system("cls");
+    #elif defined(__linux__) || defined(__APPLE__)
+        system("clear");
+    #else
+        // No se reconoce el sistema operativo
+        printf("No se puede limpiar la pantalla en este sistema.\n");
+    #endif
 }
