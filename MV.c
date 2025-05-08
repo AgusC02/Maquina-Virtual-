@@ -104,10 +104,15 @@ void inicializoMVen0(TMV *MV){
     
 }
 void initparametrosMV(TMV *MV){
+    /*
+    ESTA FUNCION SOLO DEBE SER LLAMADA POR DEP_ARG, 
+    */
     MV->size_paramsegment=0;
     MV->disassembler=0;
     MV->argc=0;
     MV->punteroargv=-1;
+    MV->archivovmi=NULL;
+    MV->flagdebug=0;
 }
 void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
 /*
@@ -218,6 +223,8 @@ void dep_arg(int argc, char *argv[], TMV *MV){
     else if (vmi && !vmx){
         if(archivo_vmi!=NULL){
             strcpy(archivo,archivo_vmi);
+            MV->archivovmi=malloc(sizeof(strlen(archivo_vmi)+1));
+            strcpy(MV->archivovmi,archivo_vmi);
         }
     }
     free(archivo_vmi);
@@ -301,11 +308,11 @@ void inicializoRegistros(TMV *MV,theader header){
 }
 
 void initheadervmx(theader *head){
-    (*head).tamCS=-1;
-    (*head).tamDS=-1;
-    (*head).tamES=-1;
-    (*head).tamSS=-1;
-    (*head).tamKS=-1;
+    (*head).tamCS=0;
+    (*head).tamDS=0;
+    (*head).tamES=0;
+    (*head).tamSS=0;
+    (*head).tamKS=0;
     (*head).entrypointoffset=-1;
 }
 
