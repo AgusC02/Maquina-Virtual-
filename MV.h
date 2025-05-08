@@ -55,8 +55,9 @@ typedef struct TMV{
   int size_paramsegment;
   int argc;
   int punteroargv;
-  char archivovmi[50];
+  char *archivovmi;
   char disassembler;
+  char flagdebug;
 }TMV;
 
 typedef struct TInstruc{

@@ -18,6 +18,62 @@ void iniciasubrutina(TMV *MV){
 
 }
 
+void mododebug(TMV *MV){
+    char comando;
+
+    comando = getchar();
+    while (getchar() != '\n'); // limpiar buffer
+
+    if (comando == 'q') {
+        exit(0);
+    } else if (comando == 'g') {
+        MV->flagdebug = 0;  //  SE DESACTIVA EL MODO DEBUG
+    }
+    // Si es enter, se sigue paso a paso sin tocar el flag
+}
+
+void generarImagen(TMV MV){
+    theadervmi header;
+    int i=0;
+    FILE *f;
+    unsigned char mem_kib;
+    unsigned int reg;
+
+    f=fopen(MV.archivovmi,"wb");
+    
+    if(!f){
+        printf("ERROR AL ABRIR ARCHIVO DE IMAGEN \n");
+        exit(1);
+    }
+
+    fwrite("VMI25",1,5,f);
+    fputc(1,f);
+    mem_kib=MV.mem_size/1024;
+    fputc((mem_kib>>8)&0xFF,f);
+    fputc(mem_kib & 0xFF,f);
+
+     // Registros (64 bytes)
+    for(i=0;i<CANTREG;i++){
+        reg=MV.R[i];
+        fputc((reg>>24)&0xFF, f);
+        fputc((reg>>16)&0xFF, f);
+        fputc((reg>>8)&0xFF, f);
+        fputc((reg)&0xFF, f);
+    }
+
+    // TDS (32 bytes)
+    for (i=0;i<CANTMAXSEGMENTOS;i++){
+        reg=MV.TDS[i];
+        fputc((reg>>24)&0xFF, f);
+        fputc((reg>>16)&0xFF, f);
+        fputc((reg>>8)&0xFF, f);
+        fputc((reg)&0xFF, f);
+    }
+    // MEMORIA (variable)
+    fwrite(MV.MEM,1,MV.mem_size,f);
+    fclose(f);
+}
+
 void init_mem0(TMV *MV){
     int i;
     for (i=0;i<TMEM;i++){
@@ -155,6 +211,7 @@ void dep_arg(int argc, char *argv[], TMV *MV){
             strcpy(archivo,archivo_vmx);
         }
         if(vmi){
+            MV->archivovmi=malloc(sizeof(strlen(archivo_vmi)+1));
             strcpy(MV->archivovmi,archivo_vmi);
         }
     }
@@ -163,6 +220,8 @@ void dep_arg(int argc, char *argv[], TMV *MV){
             strcpy(archivo,archivo_vmi);
         }
     }
+    free(archivo_vmi);
+    free(archivo_vmx);
     LeoArch(archivo,MV);
 
 }
@@ -499,7 +558,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
     TInstruc instruc;
     TFunc Funciones;
     int DirFisicaActual;
-
+  
     declaroFunciones(Funciones);
 
     finCS=posmaxCODESEGMENT(*MV);
@@ -519,6 +578,10 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
             Funciones[CodOp](MV,instruc);
         }else
             generaerror(ERRINVINST);
+        if (MV->flagdebug && (MV->archivovmi != NULL)) {
+                generarImagen(*MV);
+                modoDebug(MV);
+        }
     }
 }
 
@@ -1517,6 +1580,11 @@ void SYS (TMV *MV, TInstruc instruccion){
     }
     else if(operando==7){
         clearscreen();
+    }
+    else if(operando==0xF){
+        if(MV->archivovmi != NULL){
+            MV->flagdebug=1;
+        }
     }
     else
         generaerror(ERRINVINST); //ESTO NO SE SI SE HACE PERO BUENO.
