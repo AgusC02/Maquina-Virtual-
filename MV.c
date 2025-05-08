@@ -154,6 +154,9 @@ void dep_arg(int argc, char *argv[], TMV *MV){
         if(archivo_vmx!=NULL){
             strcpy(archivo,archivo_vmx);
         }
+        if(vmi){
+            strcpy(MV->archivovmi,archivo_vmi);
+        }
     }
     else if (vmi && !vmx){
         if(archivo_vmi!=NULL){
