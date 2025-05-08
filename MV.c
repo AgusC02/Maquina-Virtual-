@@ -1501,24 +1501,13 @@ void SYS (TMV *MV, TInstruc instruccion){
             printf("\n");
         }
     }else if (operando == 3){
-        //Codear SYS 3 STRING READ
-        /*
-        almacena en un rango de celdas de memoria los datos leídos desde el teclado.
-        Almacena lo que se lee en la posición de memoria apuntada por EDX. En CX (16 bits) se especifica la
-        cantidad máxima de caracteres a leer. Si CX tiene -1 no se limita la cantidad de caracteres a leer.
 
-        */
     }
     else if(operando == 4){
-        //Codear SYS 4 STRING WRITE
-        /*
-        imprime por pantalla un rango de celdas donde se encuentra un string. Inicia en la
-        posición de memoria apuntada por EDX, e imprime hasta encontrar un '\0' (0x00).
 
-        */
     }
     else if(operando==7){
-        clearscreen();
+        clearsc
     }
     else
         generaerror(ERRINVINST); //ESTO NO SE SI SE HACE PERO BUENO.
