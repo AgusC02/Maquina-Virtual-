@@ -3,36 +3,265 @@
 #include <string.h>
 #include "MV.h"
 
-void inicializoTDS(TMV* MV,short int TamCS){
-  MV->TDS[CS]=TamCS;
-  MV->TDS[DS]=TamCS << 16;
-  MV->TDS[DS]+=(TMEM-TamCS);
+void iniciasubrutina(TMV *MV){
+    int posicionfisicaSS;
+    // Habria que preguntar que pasa si se define el stack segment como 0, que pasaria con la subrutina principal.
+    posicionfisicaSS=direccionamiento_logtofis(MV->R[SS]);
+    
+    // Posicionfisica SS apunta a la ultima direccion posible de memoria
+    MV->MEM[posicionfisicaSS]=MV->punteroargv;
+    posicionfisicaSS--;
+    MV->MEM[posicionfisicaSS]=MV->argc;
+    posicionfisicaSS--;
+    MV->MEM[posicionfisicaSS]=0xFFFFFFFF;
+    MV->R[SP]=posicionfisicaSS;
+
 }
 
-void inicializoRegistros(TMV *MV){
-  MV->R[CS]=0X00000000;
-  MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
-  MV->R[IP]=MV->R[CS]; //IP
+void init_mem0(TMV *MV){
+    int i;
+    for (i=0;i<TMEM;i++){
+        MV->MEM[i]=0;
+    }
 }
 
-void inicializoErrores(TMV *MV){
-  MV->Errores[0]=0;
-  MV->Errores[1]=0;
-  MV->Errores[2]=0;
+void init_reg0(TMV *MV){
+    int i;
+    for (i=0;i<CANTREG;i++){
+        MV->R[i]=0;
+    }
+}
+
+void init_tds0(TMV *MV){
+    int i;
+    for (i=0;i<CANTMAXSEGMENTOS;i++){
+        MV->TDS[i]=0;
+    }
+}
+
+void inicializoMVen0(TMV *MV){
+    int i;
+    
+    init_mem0(MV);
+    init_reg0(MV);
+    init_tds0(MV);
+    
+}
+void initparametrosMV(TMV *MV){
+    MV->size_paramsegment=0;
+    MV->disassembler=0;
+    MV->argc=0;
+    MV->punteroargv=-1;
+}
+void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
+/*
+    ESTA FUNCION TIENE QUE ARMAR EL PARAM SEGMENT Y
+    CALCULAR SU TAMAÑO EN BYTES Y DEVOLVERLO EN *paramsize para setear la MV
+    [EN PROCESO]
+
+    El segmento esta compuesto por los strings parametros y al final
+    un arreglo argv de tamaño argc de punteros de 4 bytes
+
+    Precondicion: argc>0 por lo tanto argv!=NULL
+    Postcondicion: Deja armado el paramsegment de la MV,
+                     y devuelve el tamaño en bytes del segmento en *paramsize
+*/
+    int i,j,memindx,sizestr=0,tam=0;
+    int vectorindices[100];
+    char *auxiliar;
+    memindx=0;
+    for (i=0;i<argc;i++){
+        sizestr+=strlen(argv[i])+1;
+        auxiliar=malloc(sizestr);
+        strcpy(auxiliar,argv[i]);
+        
+        vectorindices[i]=memindx;
+        for(j=0;j<sizestr;j++){
+            MV->MEM[memindx++]=auxiliar[j];
+        }
+
+        tam+=sizestr;
+        free(auxiliar);
+    }
+    //Despues de este for ya tenemos los strings copiados
+    //Defino el puntero a argv que le voy a pasar a la maquina virtual para armar la subrutina principal.
+    //Este es el indice porque la posicion del paramsegment es 0 en el tds
+    // y el memindx es el offset. Para integrarlo mejor en otro momento habria que buscar otra forma.
+    // por ahora va a quedar asi.
+    MV->punteroargv=memindx;
+    //-----------------------
+
+    for(i=0;i<argc;i++){
+        for(j=3;j>0;j--){
+            MV->MEM[memindx++]= (vectorindices[i] >> (8*j));
+        }
+    }
+    //Despues de este doble for ya tenemos el arreglo de argumentos cargado.
+    MV->argc=argc;
+    tam+= argc*4;
+    *paramsize=tam;
+}
+
+void dep_arg(int argc, char *argv[], TMV *MV){
+    /*
+    * Funcion para depurar los argumentos e inicializar la maquina virtual
+    */
+   int tammem=16;
+   int cant_params=0;
+   char vmx,vmi,disassembler=0;
+   int argindx;
+   char *archivo_vmx = NULL;
+   char *archivo_vmi = NULL;
+   char archivo[50];
+   char **vectorparams = NULL;
+   int paramsize=0;
+    
+   initparametrosMV(MV);
+
+    for (argindx=1; argindx<argc;argindx++){
+        
+        if(strncmp(argv[argindx],"m=",2)==0){ // Checkea m=M
+            tammem=atoi(argv[argindx]+2);
+        }
+        else if (strcmp(argv[argindx],"-d")==0){ // Checkea disassembler
+            disassembler=1;
+        }
+        else if (archivo_vmx == NULL && strstr(argv[argindx],".vmx")){ //Checkea .vmx
+            vmx=1;
+            archivo_vmx= malloc(strlen(argv[argindx])+1);
+            strcpy(archivo_vmx,argv[argindx]);
+        }
+        else if (archivo_vmi == NULL && strstr(argv[argindx],".vmi")){ //Checkea .vmi
+            vmi=1;
+            archivo_vmi= malloc(strlen(argv[argindx])+1);
+            strcpy(archivo_vmi,argv[argindx]);
+        }
+        else if(vmx==1 && strcmp(argv[argindx],"-p")==0){ //Checkea -p
+            // lo que viene despues son los parametros
+            cant_params= argc-argindx-1;
+            vectorparams=&argv[argindx+1];
+            
+            //vectorparams apunta al primer parametro y cant_params tiene la cantidad.
+            if(cant_params>0)
+                armaParamSegment(MV,cant_params,vectorparams,&paramsize);
+        }
+    }
+    MV->size_paramsegment=paramsize;
+    MV->mem_size=tammem*1024;
+    MV->disassembler=disassembler;
+
+    if(vmx){
+        if(archivo_vmx!=NULL){
+            strcpy(archivo,archivo_vmx);
+        }
+        if(vmi){
+            strcpy(MV->archivovmi,archivo_vmi);
+        }
+    }
+    else if (vmi && !vmx){
+        if(archivo_vmi!=NULL){
+            strcpy(archivo,archivo_vmi);
+        }
+    }
+    LeoArch(archivo,MV);
+
+}
+
+void initregsegmentos(TMV *MV){
+    int i;
+    for(i=1;i<IP;i++){
+        MV->R[i]=-1;
+    }
+}
+void agregasegmentos(unsigned short int tam, int reg_indx,TMV *MV, int *tds_indx, int sizeac){
+    if(tam>0){
+        MV->TDS[*tds_indx]=sizeac;
+        MV->TDS[*tds_indx]<<= 16; // quedo la base
+        MV->TDS[*tds_indx] |= (tam & 0xFFFF);
+
+        if(reg_indx>=0){
+            MV->R[reg_indx]= (*tds_indx);
+            MV->R[reg_indx] <<= 16;
+        }
+        (*tds_indx)++;
+    }
+    else if(reg_indx>=0){
+        MV->R[reg_indx]=-1;
+    }
+}
+
+void inicializoTDS(TMV* MV,theader header){
+short int TamCS;
+  int indicetds=0,sizeac=0;
+
+  TamCS=header.tamCS;
+  if (header.version==1){
+        MV->mem_size=TMEM;
+        MV->TDS[CS]=TamCS;
+        MV->TDS[DS]=TamCS << 16;
+        MV->TDS[DS]+=(MV->mem_size-TamCS);
+  } else if (header.version==2){
+        // Agregue dos parametros flag en MV (mem_size y param).
+        initregsegmentos(MV);
+        
+        agregasegmentos(MV->size_paramsegment,-1,MV,&indicetds,sizeac);
+        sizeac+=MV->size_paramsegment;  //esto tendria que ser el tamaño del paramsegm
+
+        agregasegmentos(header.tamKS,KS,MV,&indicetds,sizeac);
+        sizeac+=header.tamKS;
+
+        agregasegmentos(header.tamCS,CS,MV,&indicetds,sizeac);
+        sizeac+=header.tamCS;
+
+        agregasegmentos(header.tamDS,DS,MV,&indicetds,sizeac);
+        sizeac+=header.tamDS;
+    
+        agregasegmentos(header.tamES,ES,MV,&indicetds,sizeac);
+        sizeac+=header.tamES;
+
+        agregasegmentos(header.tamSS,SS,MV,&indicetds,sizeac);
+        sizeac+=header.tamSS;
+
+        if (sizeac>MV->mem_size)
+            generaerror(ERRMEM);
+
+        MV->R[IP]=(MV->R[CS] & 0xFFFF0000) | header.entrypointoffset;
+        if(MV->R[SS]!=-1)
+            MV->R[SP]=MV->R[SS] + header.tamSS; // Habria que checkear si existe SS primero
+        iniciasubrutina(MV); // Puede estar dentro del if de arriba creo.
+  }
+}
+
+void inicializoRegistros(TMV *MV,theader header){
+  
+    if (header.version==1){
+        MV->R[CS]=0X00000000;
+        MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
+        MV->R[IP]=MV->R[CS]; //IP
+    }  
+}
+
+void initheadervmx(theader *head){
+    (*head).tamCS=-1;
+    (*head).tamDS=-1;
+    (*head).tamES=-1;
+    (*head).tamSS=-1;
+    (*head).tamKS=-1;
+    (*head).entrypointoffset=-1;
 }
 
 void generaerror(int tipo){
-    if(tipo==0)
+    if(tipo==ERRDIV0)
         printf("ERROR DIVISION POR 0");
-    if(tipo==1)
+    if(tipo==ERRINVINST)
         printf("ERROR INSTRUCCION INVALIDA");
-    if(tipo==2)
+    if(tipo==ERRSEGMF)
         printf("ERROR FALLO DE SEGMENTO");
-    if(tipo==3)
+    if(tipo==ERRMEM)
         printf("MEMORIA INSUFICIENTE");
-    if(tipo==4)
+    if(tipo==ERRSTOVF)
         printf("STACK OVERFLOW");
-    if(tipo==5)
+    if(tipo==ERRSTUNF)
         printf("STACK UNDERFLOW");
     abort();
 }
@@ -128,7 +357,11 @@ void LeoArch(char nomarch[],TMV *MV){
   FILE *arch;
   unsigned char leo;
   theader header;
-  int i=0;
+  theadervmi headervmi;
+  
+  int j,i=0;
+  //Inicializa header para lectura de datos (los tamaños de segmentos en -1)
+  initheadervmx(&header);
   //DEBO PREPARAR ARCHIVO PARA LECTURA
   arch = fopen(nomarch,"rb");
   fread(&header.c1,sizeof(char),1,arch);
@@ -137,27 +370,91 @@ void LeoArch(char nomarch[],TMV *MV){
   fread(&header.c4,sizeof(char),1,arch);
   fread(&header.c5,sizeof(char),1,arch);
   fread(&header.version,sizeof(char),1,arch);
-
   fread(&leo,sizeof(char),1,arch);
-  header.tam=leo;
-  header.tam=header.tam<<8;
+  header.tamCS=leo;
+  header.tamCS=header.tamCS<<8;
   fread(&leo,sizeof(char),1,arch);
-  header.tam+=leo;
-
-
+  header.tamCS+=leo;
 
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
-    if (header.version == 1){
-        inicializoTDS(MV,header.tam);
-        inicializoRegistros(MV);
-        inicializoErrores(MV);
-        //CARGAR EL CODIGO EN LA MEMORIA DE LA MV
-        while(!feof(arch)){
-            fread(&(MV->MEM[i]),1,1,arch);
-            i++;
+    if (header.version==1){
+    inicializoTDS(MV,header);
+    inicializoRegistros(MV,header);
+
+    while(!feof(arch)){
+        fread(&(MV->MEM[i]),1,1,arch);
+        i++;
+    }
+    }
+    else if (header.version==2){
+        fread(&leo,sizeof(char),1,arch);
+        header.tamDS=leo;
+        header.tamDS=header.tamDS<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.tamDS+=leo;
+
+        fread(&leo,sizeof(char),1,arch);
+        header.tamES=leo;
+        header.tamES=header.tamES<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.tamES+=leo;
+
+        fread(&leo,sizeof(char),1,arch);
+        header.tamSS=leo;
+        header.tamSS=header.tamSS<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.tamSS+=leo;
+
+        fread(&leo,sizeof(char),1,arch);
+        header.tamKS=leo;
+        header.tamKS=header.tamKS<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.tamKS+=leo;
+
+        fread(&leo,sizeof(char),1,arch);
+        header.entrypointoffset=leo;
+        header.entrypointoffset=header.entrypointoffset<<8;
+        fread(&leo,sizeof(char),1,arch);
+        header.entrypointoffset+=leo;
+
+        
+        inicializoTDS(MV,header);
+
+        
+    }
+    }else if (header.c1=='V' && header.c2 =='M' && header.c3=='I' && header.c4=='2' && header.c5=='5'){
+        // ENTRA CON UN ARCHIVO DE IMAGEN.
+        headervmi.carV=header.c1;
+        headervmi.carM=header.c2;
+        headervmi.carI=header.c3;
+        headervmi.car2=header.c4;
+        headervmi.car5=header.c5;
+        headervmi.mem_size=header.tamCS;
+        //SI ENTRO ACA ES PORQUE TENGO Q BASARME EN LA IMAGEN
+        inicializoMVen0(MV);
+        MV->mem_size=headervmi.mem_size;
+        for(i=0;i<CANTREG;i++){ //LEO LOS REGISTROS
+            for(j=0;j<4;j++){
+                fread(&leo,sizeof(char),1,arch);
+                MV->R[i]<<=4;
+                MV->R[i]|=leo;
+            }
         }
-    }
-    }
+
+        for(i=0;i<CANTMAXSEGMENTOS;i++){
+            for(j=0;j<4;j++){
+                fread(&leo,sizeof(char),1,arch);
+                MV->TDS[i] <<= 4;
+                MV->TDS[i] |= leo;
+            }
+        }
+
+        for(i=0;i<MV->mem_size;i++){
+            fread(&leo,sizeof(char),1,arch);
+            MV->MEM[i]=leo;
+        }
+        //MAQUINA VIRTUAL SETEADA COMO LA IMAGEN.
+    } 
    fclose(arch);
   }
 
@@ -176,7 +473,7 @@ int direccionamiento_logtofis(TMV MV, int puntero){
 
 
     if (!( (DirBase <= DirFisica ) && (DirFisica <= LimiteSup  ) )){ // FALTA EL +4 EN DIR FISICA SI ES MEMORIA
-        generaerror(2);
+        generaerror(ERRSEGMF);
         return -1;        // Aca nunca va a llegar si llama a generaerror, porque la ultima instruccion de la funcion es abort().
     }
     else
@@ -221,7 +518,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
             MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
         }else
-            generaerror(1);
+            generaerror(ERRINVINST);
     }
 }
 
@@ -589,7 +886,7 @@ void DIV(TMV * MV,TInstruc instruc){
     guardoOpB(*MV,instruc,&divisor);
 
     if (divisor == 0)
-        generaerror(0);
+        generaerror(ERRDIV0);
     else{
        //OPA
        int Dividendo;
@@ -1205,7 +1502,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         }
     }
     else
-        generaerror(1); //ESTO NO SE SI SE HACE PERO BUENO.
+        generaerror(ERRINVINST); //ESTO NO SE SI SE HACE PERO BUENO.
 }
 
 void JMP (TMV *MV,TInstruc instruccion){
@@ -1227,7 +1524,7 @@ void JMP (TMV *MV,TInstruc instruccion){
 
     // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
     if (sobrepasaCS(*MV,asignable)==1)
-        generaerror(2);
+        generaerror(ERRSEGMF);
 
     MV->R[IP]=asignable;
 
@@ -1252,7 +1549,7 @@ void JZ (TMV *MV,TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1276,7 +1573,7 @@ void JP (TMV *MV,TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1300,7 +1597,7 @@ void JN (TMV *MV,TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1324,7 +1621,7 @@ void JNZ (TMV *MV,TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1348,7 +1645,7 @@ void JNP (TMV *MV, TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
@@ -1372,7 +1669,7 @@ void JNN (TMV *MV, TInstruc instruccion){
 
         // Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
         if (sobrepasaCS(*MV,asignable)==1)
-            generaerror(2);
+            generaerror(ERRSEGMF);
 
         MV->R[IP]=asignable;
     }
