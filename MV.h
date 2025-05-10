@@ -107,7 +107,7 @@ int devuelveN(TMV *MV);
 int devuelveZ(TMV *MV);
 int leer_binario_c2_32(void);
 char *int_to_c2bin(int numero);
-
+void setvaloresSYS(TMV MV,char *mod, char *cantceldas, char *size, int *pos_i, int *pos_max);
 //DEBUG
 void muestraheader(theader h);
 void muestraMVfijos(TMV MV);

@@ -597,7 +597,7 @@ int direccionamiento_logtofis(TMV MV, int puntero){
 int posmaxCODESEGMENT(TMV MV){
     int finCS,baseCS,tamCS;
 
-    baseCS =((MV.TDS[MV.R[CS] >> 16]) & 0XFFFF0000) >> 16;
+    baseCS = direccionamiento_logtofis(MV,MV.R[CS]);
     tamCS = (MV.TDS[MV.R[CS] >> 16]) & 0XFFFF;
     finCS = baseCS + tamCS;
     return finCS;
@@ -618,9 +618,14 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
     finCS=posmaxCODESEGMENT(*MV);
 
-    while(MV->R[IP]<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
+    printf("-----FLAG ENTRA A LeoInstruccion\n");
+    printf("-----FLAG fincs=%04X (%d)\n",finCS,finCS);
+
+    //DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
+    while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
 
+        printf("-----FLAG ENTRA A WHILE \n");
         ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
 
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
@@ -637,6 +642,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
                 generarImagen(*MV);
                 mododebug(MV);
         }
+        //DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
     }
 }
 
@@ -1498,6 +1504,21 @@ char *int_to_c2bin(int numero) {
     return trimmed;
 }
 
+void setvaloresSYS(TMV MV,char *mod, char *cantceldas, char *size, int *pos_i, int *pos_max){
+    char modo,celdas,sizelocal;
+
+    modo= MV.R[EAX]& 0xFF;
+    *mod = modo;
+
+     celdas = MV.R[ECX]& 0xFF;
+     *cantceldas=celdas;
+
+     sizelocal=(MV.R[ECX]>>8)& 0xFF;
+     *size=sizelocal;
+
+    *pos_i=direccionamiento_logtofis(MV,MV.R[EDX]);
+    *pos_max=direccionamiento_logtofis(MV, MV.R[EDX] + celdas * sizelocal); // Para verificar fallo de segmento
+}
 
 // -------------------------------------- FUNCIONES CON 1 OPERANDO
 void SYS (TMV *MV, TInstruc instruccion){
@@ -1514,7 +1535,7 @@ void SYS (TMV *MV, TInstruc instruccion){
     char *bin;
     unsigned char Sec,Codreg;
 
-
+    printf("\n-----FLAG ENTRA A SYS\n");
     if(instruccion.TamA==1){
         DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
         DefinoAuxRegistro(&operando,*MV,Sec,Codreg);
@@ -1527,16 +1548,18 @@ void SYS (TMV *MV, TInstruc instruccion){
     else
         operando=LeoEnMemoria(*MV,instruccion.OpA);
 
-    //SETEO VALORES
+    //SETEO VALORES -> Lo paso a una funcion
 
-    modo= MV->R[EAX]& 0xFF;
+    /*modo= MV->R[EAX]& 0xFF;
     celdas= MV->R[ECX]& 0xFF;
     size= (MV->R[ECX]>>8)& 0xFF;
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
 
     pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size); // Para verificar fallo de segmento.
+    */
 
-    if(operando==1){    //READ
+    if(operando==1){//READ
+        setvaloresSYS(*MV,&modo,&celdas,&size,&pos_inicial_memoria,&pos_max_acceso);
         for(i=0;i<celdas;i++){
             printf("[%04X] ",pos_inicial_memoria);
             if(modo==0x10){
@@ -1577,6 +1600,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         }
     }
     else if (operando==2){ //WRITE.
+        setvaloresSYS(*MV,&modo,&celdas,&size,&pos_inicial_memoria,&pos_max_acceso);
         for (i=0;i<celdas;i++){
             printf("[%04X] ",pos_inicial_memoria);
             // PASA LO MISMO CON EL WRITE. SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4 ESTA BIEN, SINO HAY QUE CORREGIR CON ALGUN FOR.
@@ -1660,6 +1684,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         clearscreen();
     }
     else if(operando==0xF){
+        printf("-----FLAG entrasysF\n");
         if(MV->archivovmi != NULL){
             MV->flagdebug=1;
         }
