@@ -84,6 +84,7 @@ void inicializoTDS(TMV* MV,theader header);
 void inicializoRegistros(TMV *MV,theader header);
 void inicializoErrores(TMV *MV);
 void initheadervmx(theader *head);
+void agregoalconstantsegment(TMV *MV,int offset, unsigned char c_agregable);
 void generaerror(int tipo);
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]); //PARA DISASSEMBLER
 void inicializoVecRegistros(char VecRegistros[CANTREG][4]);  //PARA DISASSEMBLER
@@ -108,6 +109,8 @@ int leer_binario_c2_32(void);
 char *int_to_c2bin(int numero);
 
 //DEBUG
+void muestraheader(theader h);
+void muestraMVfijos(TMV MV);
 void muestramemoria(unsigned char memoria[]);
 void muestraregistros(int reg[]);
 void muestratds(int tds[]);
