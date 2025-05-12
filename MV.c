@@ -597,9 +597,9 @@ int direccionamiento_logtofis(TMV MV, int puntero){
     // A CHEQUEAR ESTO
     if (((puntero & 0XFFFF0000) >> 16) == SS) //ES SP, chequeo stack overflow y stack underflow
         if (puntero < MV.R[SS])
-            generaerror(ERRSTOVF)
+            generaerror(ERRSTOVF);
         else
-            if (Offset > ((MV.TDS[((MV.R[SS] & 0XFFFF0000) >> 16 )] & 0XFFFF))
+            if (Offset > ((MV.TDS[((MV.R[SS] & 0XFFFF0000) >> 16 )] & 0XFFFF)))
                 generaerror(ERRSTUNF);
     else
         if (!( (DirBase <= DirFisica ) && (DirFisica <= LimiteSup  ) ))
@@ -742,7 +742,7 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
-    modif = Op & 0X3
+    modif = Op & 0X3;
     int TamModif = ~modif + 1;
     puntero=(MV).R[CodReg]+offset;
 
@@ -1938,11 +1938,11 @@ void NOT (TMV *MV, TInstruc instruccion){
     modificoCC(MV,resultado);
 }
 
-void PUSH(TMV *MV, TInstruc instruccion){
-    int op,PosSP,PosSS,puntero;
+void PUSH(TMV *MV, TInstruc instruc){
+    int PosSP,PosSS,puntero,guardo=0;
     unsigned char SecA;
 
-    guardoOp(*MV,instruc,&op);
+    guardoOp(*MV,instruc,&guardo);
 
     //Primero se mueve en la pila y luego guarda
 
@@ -1951,7 +1951,7 @@ void PUSH(TMV *MV, TInstruc instruccion){
     PosSP = direccionamiento_logtofis(*MV,MV->R[SP]);
 
     for (int i=0;i<4;i++){ //Recorro los 4 bytes
-        MV->M[PosSP] = guardo & 0XFF;
+        MV->MEM[PosSP] = guardo & 0XFF;
         PosSP++;
         guardo = guardo >> 8;
     }
@@ -1959,17 +1959,18 @@ void PUSH(TMV *MV, TInstruc instruccion){
 
 }
 
-void POP(TMV *MV, TInstruc instruccion){
+void POP(TMV *MV, TInstruc instruc){
     int guardo=0,PosReg,PosReg2;
+    int PosSP,CodOpA;
     unsigned char SecA;
     //Primero levanta el dato (lo guarda en OpA) y luego corre SP (+4)
 
     //LEVANTO EL DATO
 
-    PosSP = direccionamiento_logtofis(MV->R[SP]+3); //o +4?
+    PosSP = direccionamiento_logtofis(*MV,MV->R[SP]+3); //o +4?
 
     for (int i=0;i<4;i++){ //Recorro los 4 bytes
-        guardo += MV->M[PosSP];
+        guardo += MV->MEM[PosSP];
         PosSP--;
         if (4 - i > 1)
             guardo = guardo << 8;
@@ -2001,7 +2002,7 @@ void POP(TMV *MV, TInstruc instruccion){
 }
 
 void CALL(TMV * MV,TInstruc instruccion){
-  int guardo,Salto,PosReg;
+  int guardo,Salto,PosReg,PosSP;
   unsigned char SecA;
 
   //ARRANCO CON PUSH IP
@@ -2011,28 +2012,28 @@ void CALL(TMV * MV,TInstruc instruccion){
     PosSP = direccionamiento_logtofis(*MV,MV->R[SP]);
 
     for (int i=0;i<4;i++){ //Recorro los 4 bytes
-        MV->M[PosSP] = guardo & 0XFF;
+        MV->MEM[PosSP] = guardo & 0XFF;
         PosSP++;
         guardo = guardo >> 8;
     }
 
     //SALTO A LA MEMORIA QUE SE INDICA EN OpA
-
-    JMP(*MV,instruccion);
+    
+    JMP(MV,instruccion); //A checkear
 }
 
 
 // -------------------------------------- FUNCIONES SIN OPERANDO
 
 void RET(TMV * MV,TInstruc instruccion){
-  int ValorRet=0,PosReg;
+  int ValorRet=0,PosReg,PosSP;
 
   //LEVANTO EL DATO
 
-    PosSP = direccionamiento_logtofis(MV->R[SP]+3); //o +4?
+    PosSP = direccionamiento_logtofis(*MV,MV->R[SP]+3); //o +4?
 
     for (int i=0;i<4;i++){ //Recorro los 4 bytes
-        ValorRet += MV->M[PosSP];
+        ValorRet += MV->MEM[PosSP];
         PosSP--;
         if (4 - i > 1)
             ValorRet = ValorRet << 8;
@@ -2043,7 +2044,7 @@ void RET(TMV * MV,TInstruc instruccion){
     MV->R[IP] = (MV->R[IP] & 0XFFFF0000);
     MV->R[IP] += (ValorRet & 0XFFFF);
   }
-}
+
 
 void STOP(TMV *MV,TInstruc instruccion){
     exit (0);
