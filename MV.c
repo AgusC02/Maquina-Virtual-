@@ -464,6 +464,7 @@ void LeoArch(char nomarch[],TMV *MV){
   int offsetks=0;
   int poscs,offsetcs=0;
 
+
   int j,i=0;
   //Inicializa header para lectura de datos (los tamaños de segmentos en -1)
   initheadervmx(&header);
@@ -543,6 +544,7 @@ void LeoArch(char nomarch[],TMV *MV){
                 offsetks++;
             }
         }
+
 
     }
     }else if (header.c1=='V' && header.c2 =='M' && header.c3=='I' && header.c4=='2' && header.c5=='5'){
