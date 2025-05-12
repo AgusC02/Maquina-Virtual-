@@ -4,7 +4,7 @@
 #define CANTFUNC 31
 #define CANTREG 16
 #define CANTERRORES 3
-#define CANTMAXSEGMENTOS 6
+#define CANTMAXSEGMENTOS 8
 #define TDDSSIZE 8
 //DEFINES PARA EL SYS
 #define BITS_32 32
@@ -84,6 +84,7 @@ void inicializoTDS(TMV* MV,theader header);
 void inicializoRegistros(TMV *MV,theader header);
 void inicializoErrores(TMV *MV);
 void initheadervmx(theader *head);
+void agregoalconstantsegment(TMV *MV,int offset, unsigned char c_agregable);
 void generaerror(int tipo);
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]); //PARA DISASSEMBLER
 void inicializoVecRegistros(char VecRegistros[CANTREG][4]);  //PARA DISASSEMBLER
@@ -106,8 +107,10 @@ int devuelveN(TMV *MV);
 int devuelveZ(TMV *MV);
 int leer_binario_c2_32(void);
 char *int_to_c2bin(int numero);
-
+void setvaloresSYS(TMV MV,char *mod, char *cantceldas, char *size, int *pos_i, int *pos_max);
 //DEBUG
+void muestraheader(theader h);
+void muestraMVfijos(TMV MV);
 void muestramemoria(unsigned char memoria[]);
 void muestraregistros(int reg[]);
 void muestratds(int tds[]);
