@@ -194,11 +194,9 @@ void dep_arg(int argc, char *argv[], TMV *MV){
    char **vectorparams = NULL;
    int paramsize=0;
 
-
    initparametrosMV(MV);
 
     for (argindx=1; argindx<argc;argindx++){
-
 
         if(strncmp(argv[argindx],"m=",2)==0){ // Checkea m=M
             tammem=atoi(argv[argindx]+2);
