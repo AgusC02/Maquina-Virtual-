@@ -169,7 +169,7 @@ void NOT(TMV * MV,TInstruc instruc);
 
 void PUSH(TMV *MV, TInstruc instruc);
 
-void POP(TMV *MV, TInstruc instruc)
+void POP(TMV *MV, TInstruc instruc);
 
 void CALL(TMV *MV, TInstruc instruc);
 
