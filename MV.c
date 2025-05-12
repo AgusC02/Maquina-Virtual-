@@ -4,16 +4,22 @@
 #include "MV.h"
 
 void iniciasubrutina(TMV *MV){
-    int posicionfisicaSS;
+    int posicionfisicaSS,i;
     // Habria que preguntar que pasa si se define el stack segment como 0, que pasaria con la subrutina principal.
     posicionfisicaSS=direccionamiento_logtofis(*MV,(*MV).R[SS]);
-    
+
     // Posicionfisica SS apunta a la ultima direccion posible de memoria
-    MV->MEM[posicionfisicaSS]=MV->punteroargv;
-    posicionfisicaSS--;
-    MV->MEM[posicionfisicaSS]=MV->argc;
-    posicionfisicaSS--;
-    MV->MEM[posicionfisicaSS]=0xFFFFFFFF;
+
+    //Coloca en la pila el puntero a memoria byte por byte. Lo hago a mano pero despues podemos armar el operando y hacer push.
+    for (i=3;i>=0;i--){
+        MV->MEM[posicionfisicaSS--]=MV->punteroargv >> (8*i);
+    }
+
+
+    for (i=3;i>=0;i--){
+        MV->MEM[posicionfisicaSS--]=MV->argc >> (8*i);
+    }
+    MV->MEM[posicionfisicaSS]=0xFF;
     MV->R[SP]=posicionfisicaSS;
 
 }
@@ -40,7 +46,7 @@ void generarImagen(TMV MV){
     unsigned int reg;
 
     f=fopen(MV.archivovmi,"wb");
-    
+
     if(!f){
         printf("ERROR AL ABRIR ARCHIVO DE IMAGEN \n");
         exit(1);
@@ -97,15 +103,15 @@ void init_tds0(TMV *MV){
 
 void inicializoMVen0(TMV *MV){
     int i;
-    
+
     init_mem0(MV);
     init_reg0(MV);
     init_tds0(MV);
-    
+
 }
 void initparametrosMV(TMV *MV){
     /*
-    ESTA FUNCION SOLO DEBE SER LLAMADA POR DEP_ARG, 
+    ESTA FUNCION SOLO DEBE SER LLAMADA POR DEP_ARG,
     */
     MV->size_paramsegment=0;
     MV->disassembler=0;
@@ -130,15 +136,21 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     int i,j,memindx,sizestr=0,tam=0;
     int vectorindices[100];
     char *auxiliar;
+    unsigned char aux_uchar;
+
     memindx=0;
     for (i=0;i<argc;i++){
-        sizestr+=strlen(argv[i])+1;
+        sizestr=0;
+
+        sizestr+=(strlen(argv[i])+1);
         auxiliar=malloc(sizestr);
         strcpy(auxiliar,argv[i]);
-        
+
         vectorindices[i]=memindx;
+
         for(j=0;j<sizestr;j++){
-            MV->MEM[memindx++]=auxiliar[j];
+            MV->MEM[memindx]=auxiliar[j];
+            memindx++;
         }
 
         tam+=sizestr;
@@ -153,10 +165,13 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     //-----------------------
 
     for(i=0;i<argc;i++){
-        for(j=3;j>0;j--){
-            MV->MEM[memindx++]= (vectorindices[i] >> (8*j));
+        for(j=3;j>=0;j--){
+            aux_uchar = vectorindices[i]>>(8*j);
+            MV->MEM[memindx]= aux_uchar;
+            memindx++;
         }
     }
+
     //Despues de este doble for ya tenemos el arreglo de argumentos cargado.
     MV->argc=argc;
     tam+= argc*4;
@@ -176,11 +191,13 @@ void dep_arg(int argc, char *argv[], TMV *MV){
    char archivo[50];
    char **vectorparams = NULL;
    int paramsize=0;
-    
+
+
    initparametrosMV(MV);
 
     for (argindx=1; argindx<argc;argindx++){
-        
+
+
         if(strncmp(argv[argindx],"m=",2)==0){ // Checkea m=M
             tammem=atoi(argv[argindx]+2);
         }
@@ -201,7 +218,7 @@ void dep_arg(int argc, char *argv[], TMV *MV){
             // lo que viene despues son los parametros
             cant_params= argc-argindx-1;
             vectorparams=&argv[argindx+1];
-            
+
             //vectorparams apunta al primer parametro y cant_params tiene la cantidad.
             if(cant_params>0)
                 armaParamSegment(MV,cant_params,vectorparams,&paramsize);
@@ -227,10 +244,10 @@ void dep_arg(int argc, char *argv[], TMV *MV){
             strcpy(MV->archivovmi,archivo_vmi);
         }
     }
+
+    LeoArch(archivo,MV);
     free(archivo_vmi);
     free(archivo_vmx);
-    LeoArch(archivo,MV);
-
 }
 
 void initregsegmentos(TMV *MV){
@@ -269,7 +286,7 @@ short int TamCS;
   } else if (header.version==2){
         // Agregue dos parametros flag en MV (mem_size y param).
         initregsegmentos(MV);
-        
+
         agregasegmentos(MV->size_paramsegment,-1,MV,&indicetds,sizeac);
         sizeac+=MV->size_paramsegment;  //esto tendria que ser el tamaño del paramsegm
 
@@ -281,7 +298,7 @@ short int TamCS;
 
         agregasegmentos(header.tamDS,DS,MV,&indicetds,sizeac);
         sizeac+=header.tamDS;
-    
+
         agregasegmentos(header.tamES,ES,MV,&indicetds,sizeac);
         sizeac+=header.tamES;
 
@@ -299,13 +316,14 @@ short int TamCS;
 }
 
 void inicializoRegistros(TMV *MV,theader header){
-  
+
     if (header.version==1){
         MV->R[CS]=0X00000000;
         MV->R[DS]=0X00010000;  //DS               //PARA INICIALIZAR EL DS TENDRIA QUE USAR LA TABLA DE SEGMENTOS EN UN FUTURO PORQUE NO SIEMPRE VA A ESTAR EN TDS[1]
         MV->R[IP]=MV->R[CS]; //IP
-    }  
+    }
 }
+
 
 void initheadervmx(theader *head){
     (*head).tamCS=0;
@@ -314,6 +332,14 @@ void initheadervmx(theader *head){
     (*head).tamSS=0;
     (*head).tamKS=0;
     (*head).entrypointoffset=-1;
+}
+
+void agregoalconstantsegment(TMV *MV,int offset, unsigned char c_agregable){
+    int direccion;
+
+    direccion=direccionamiento_logtofis(*MV,MV->R[KS]+offset);
+    MV->MEM[direccion]=c_agregable;
+
 }
 
 void generaerror(int tipo){
@@ -329,6 +355,8 @@ void generaerror(int tipo){
         printf("STACK OVERFLOW");
     if(tipo==ERRSTUNF)
         printf("STACK UNDERFLOW");
+    if(tipo==99)
+        printf("ERROR APERTURA DE ARCHIVO");
     abort();
 }
 
@@ -424,12 +452,16 @@ void LeoArch(char nomarch[],TMV *MV){
   unsigned char leo;
   theader header;
   theadervmi headervmi;
-  
+  int offsetks=0;
+  int poscs,offsetcs=0;
+
   int j,i=0;
   //Inicializa header para lectura de datos (los tamaños de segmentos en -1)
   initheadervmx(&header);
   //DEBO PREPARAR ARCHIVO PARA LECTURA
   arch = fopen(nomarch,"rb");
+  if(!arch)
+    generaerror(99);
   fread(&header.c1,sizeof(char),1,arch);
   fread(&header.c2,sizeof(char),1,arch);
   fread(&header.c3,sizeof(char),1,arch);
@@ -483,10 +515,26 @@ void LeoArch(char nomarch[],TMV *MV){
         fread(&leo,sizeof(char),1,arch);
         header.entrypointoffset+=leo;
 
-        
+
         inicializoTDS(MV,header);
 
-        
+        for(i=0;i<header.tamCS;i++){
+            //Leo el codigo maquina del programa
+            fread(&leo,sizeof(char),1,arch);
+            poscs=direccionamiento_logtofis(*MV,MV->R[CS]+offsetcs);
+            MV->MEM[poscs]=leo;
+            offsetcs++;
+        }
+
+        //Agrego el contenido del CONST SEGMENT
+        if(header.tamKS){
+            for(i=0;i<header.tamKS;i++){
+                fread(&leo,sizeof(char),1,arch);
+                agregoalconstantsegment(MV,offsetks,leo);
+                offsetks++;
+            }
+        }
+
     }
     }else if (header.c1=='V' && header.c2 =='M' && header.c3=='I' && header.c4=='2' && header.c5=='5'){
         // ENTRA CON UN ARCHIVO DE IMAGEN.
@@ -520,7 +568,7 @@ void LeoArch(char nomarch[],TMV *MV){
             MV->MEM[i]=leo;
         }
         //MAQUINA VIRTUAL SETEADA COMO LA IMAGEN.
-    } 
+    }
    fclose(arch);
   }
 
@@ -549,7 +597,7 @@ int direccionamiento_logtofis(TMV MV, int puntero){
 int posmaxCODESEGMENT(TMV MV){
     int finCS,baseCS,tamCS;
 
-    baseCS =((MV.TDS[MV.R[CS] >> 16]) & 0XFFFF0000) >> 16;
+    baseCS = direccionamiento_logtofis(MV,MV.R[CS]);
     tamCS = (MV.TDS[MV.R[CS] >> 16]) & 0XFFFF;
     finCS = baseCS + tamCS;
     return finCS;
@@ -565,14 +613,19 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
     TInstruc instruc;
     TFunc Funciones;
     int DirFisicaActual;
-  
+
     declaroFunciones(Funciones);
 
     finCS=posmaxCODESEGMENT(*MV);
 
-    while(MV->R[IP]<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
+    printf("-----FLAG ENTRA A LeoInstruccion\n");
+    printf("-----FLAG fincs=%04X (%d)\n",finCS,finCS);
+
+    //DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
+    while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
 
+        printf("-----FLAG ENTRA A WHILE \n");
         ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
 
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
@@ -587,8 +640,9 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
             generaerror(ERRINVINST);
         if (MV->flagdebug && (MV->archivovmi != NULL)) {
                 generarImagen(*MV);
-                modoDebug(MV);
+                mododebug(MV);
         }
+        //DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
     }
 }
 
@@ -1251,6 +1305,29 @@ void RND(TMV * MV,TInstruc instruc){
 
 }
 //---------------------------------------------------------------DEBUG-------------------------------------------------------------------
+void muestraheader(theader h){
+    printf("%c %c %c %c %c",h.c1,h.c2,h.c3,h.c4,h.c5);
+    printf("\n version:%d",h.version);
+    printf("\n tamCS: %d",h.tamCS);
+    printf("\n tamDS: %d",h.tamDS);
+    printf("\n tamES: %d",h.tamES);
+    printf("\n tamSS: %d",h.tamSS);
+    printf("\n tamKS: %d",h.tamKS);
+    printf("\n offsetentrypoint: %d",h.entrypointoffset);
+}
+
+void muestraMVfijos(TMV MV){
+    printf("\n-------FLAG MV \n");;
+    //if(MV.archivovmi)
+        //printf("\n archivo vmi: %s",MV.archivovmi);
+    printf("\n argc: %d",MV.argc);
+    printf("\n -d: %d",MV.disassembler);
+    printf("\n flag debug: %d",MV.flagdebug);
+    printf("\n MEM SIZE: %d",MV.mem_size);
+    printf("\n posicion a la que apunta el puntero argv: %d",MV.punteroargv);
+    printf("\n SIZE PARAMSEGMENT :%d \n",MV.size_paramsegment);
+}
+
 void muestramemoria(unsigned char memoria[]){
     int pos_i,pos_f;
     printf("Ingresar de que posicion a que posicion mostrar\n Pos_inicial: ");
@@ -1427,6 +1504,21 @@ char *int_to_c2bin(int numero) {
     return trimmed;
 }
 
+void setvaloresSYS(TMV MV,char *mod, char *cantceldas, char *size, int *pos_i, int *pos_max){
+    char modo,celdas,sizelocal;
+
+    modo= MV.R[EAX]& 0xFF;
+    *mod = modo;
+
+     celdas = MV.R[ECX]& 0xFF;
+     *cantceldas=celdas;
+
+     sizelocal=(MV.R[ECX]>>8)& 0xFF;
+     *size=sizelocal;
+
+    *pos_i=direccionamiento_logtofis(MV,MV.R[EDX]);
+    *pos_max=direccionamiento_logtofis(MV, MV.R[EDX] + celdas * sizelocal); // Para verificar fallo de segmento
+}
 
 // -------------------------------------- FUNCIONES CON 1 OPERANDO
 void SYS (TMV *MV, TInstruc instruccion){
@@ -1443,7 +1535,7 @@ void SYS (TMV *MV, TInstruc instruccion){
     char *bin;
     unsigned char Sec,Codreg;
 
-
+    printf("\n-----FLAG ENTRA A SYS\n");
     if(instruccion.TamA==1){
         DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
         DefinoAuxRegistro(&operando,*MV,Sec,Codreg);
@@ -1456,16 +1548,18 @@ void SYS (TMV *MV, TInstruc instruccion){
     else
         operando=LeoEnMemoria(*MV,instruccion.OpA);
 
-    //SETEO VALORES
+    //SETEO VALORES -> Lo paso a una funcion
 
-    modo= MV->R[EAX]& 0xFF;
+    /*modo= MV->R[EAX]& 0xFF;
     celdas= MV->R[ECX]& 0xFF;
     size= (MV->R[ECX]>>8)& 0xFF;
     pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
 
     pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size); // Para verificar fallo de segmento.
+    */
 
-    if(operando==1){    //READ
+    if(operando==1){//READ
+        setvaloresSYS(*MV,&modo,&celdas,&size,&pos_inicial_memoria,&pos_max_acceso);
         for(i=0;i<celdas;i++){
             printf("[%04X] ",pos_inicial_memoria);
             if(modo==0x10){
@@ -1506,6 +1600,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         }
     }
     else if (operando==2){ //WRITE.
+        setvaloresSYS(*MV,&modo,&celdas,&size,&pos_inicial_memoria,&pos_max_acceso);
         for (i=0;i<celdas;i++){
             printf("[%04X] ",pos_inicial_memoria);
             // PASA LO MISMO CON EL WRITE. SI CH SOLO PUEDE TOMAR VALORES DE 1 A 4 ESTA BIEN, SINO HAY QUE CORREGIR CON ALGUN FOR.
@@ -1589,6 +1684,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         clearscreen();
     }
     else if(operando==0xF){
+        printf("-----FLAG entrasysF\n");
         if(MV->archivovmi != NULL){
             MV->flagdebug=1;
         }
