@@ -4,23 +4,27 @@
 #include "MV.h"
 
 void iniciasubrutina(TMV *MV){
-    int posicionfisicaSS,i;
+    int posicionfisicaSP,i;
     // Habria que preguntar que pasa si se define el stack segment como 0, que pasaria con la subrutina principal.
-    posicionfisicaSS=direccionamiento_logtofis(*MV,(*MV).R[SS]);
+    posicionfisicaSP=direccionamiento_logtofis(*MV,(*MV).R[SP]);
 
-    // Posicionfisica SS apunta a la ultima direccion posible de memoria
+    // Posicionfisica SP apunta a la ultima direccion posible de memoria
 
     //Coloca en la pila el puntero a memoria byte por byte. Lo hago a mano pero despues podemos armar el operando y hacer push.
     for (i=3;i>=0;i--){
-        MV->MEM[posicionfisicaSS--]=MV->punteroargv >> (8*i);
+        MV->MEM[posicionfisicaSP--]=MV->punteroargv >> (8*i);
     }
 
 
     for (i=3;i>=0;i--){
-        MV->MEM[posicionfisicaSS--]=MV->argc >> (8*i);
+        MV->MEM[posicionfisicaSP--]=MV->argc >> (8*i);
     }
-    MV->MEM[posicionfisicaSS]=0xFF;
-    MV->R[SP]=posicionfisicaSS;
+
+    for (i=3;i>=0;i--){ //AGREGA EL RET -1
+        MV->MEM[posicionfisicaSP--]=0xFF;
+    }
+
+    MV->R[SP]-=12;
 
 }
 
@@ -165,6 +169,7 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     //-----------------------
 
     for(i=0;i<argc;i++){
+        printf("vectorindices[%d]= %d \n",i,vectorindices[i]);
         for(j=3;j>=0;j--){
             aux_uchar = vectorindices[i]>>(8*j);
             MV->MEM[memindx]= aux_uchar;
@@ -265,6 +270,11 @@ void agregasegmentos(unsigned short int tam, int reg_indx,TMV *MV, int *tds_indx
         if(reg_indx>=0){
             MV->R[reg_indx]= (*tds_indx);
             MV->R[reg_indx] <<= 16;
+            if(reg_indx == SS){//CUANDO INICIALIZO SS INICIALIZO SP TAMBIEN.
+                MV->R[SP]= (*tds_indx);
+                MV->R[SP] <<= 16;
+                MV->R[SP] |= (tam & 0xFFFF);
+            }
         }
         (*tds_indx)++;
     }
@@ -309,8 +319,7 @@ short int TamCS;
             generaerror(ERRMEM);
 
         MV->R[IP]=(MV->R[CS] & 0xFFFF0000) | header.entrypointoffset;
-        if(MV->R[SS]!=-1)
-            MV->R[SP]=MV->R[SS] + header.tamSS; // Habria que checkear si existe SS primero
+        // Habria que checkear si existe SS primero
         iniciasubrutina(MV); // Puede estar dentro del if de arriba creo.
   }
 }
@@ -618,14 +627,12 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
     finCS=posmaxCODESEGMENT(*MV);
 
-    printf("-----FLAG ENTRA A LeoInstruccion\n");
-    printf("-----FLAG fincs=%04X (%d)\n",finCS,finCS);
 
     //DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
     while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
 
-        printf("-----FLAG ENTRA A WHILE \n");
+
         ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
 
         if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
@@ -1317,7 +1324,7 @@ void muestraheader(theader h){
 }
 
 void muestraMVfijos(TMV MV){
-    printf("\n-------FLAG MV \n");;
+    printf("\n-------FLAG MV \n");
     //if(MV.archivovmi)
         //printf("\n archivo vmi: %s",MV.archivovmi);
     printf("\n argc: %d",MV.argc);
@@ -1535,7 +1542,7 @@ void SYS (TMV *MV, TInstruc instruccion){
     char *bin;
     unsigned char Sec,Codreg;
 
-    printf("\n-----FLAG ENTRA A SYS\n");
+
     if(instruccion.TamA==1){
         DefinoRegistro(&Sec,&Codreg,instruccion.OpA);
         DefinoAuxRegistro(&operando,*MV,Sec,Codreg);
@@ -1684,7 +1691,7 @@ void SYS (TMV *MV, TInstruc instruccion){
         clearscreen();
     }
     else if(operando==0xF){
-        printf("-----FLAG entrasysF\n");
+
         if(MV->archivovmi != NULL){
             MV->flagdebug=1;
         }
