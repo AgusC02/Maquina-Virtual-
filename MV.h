@@ -9,7 +9,7 @@
 //DEFINES PARA EL SYS
 #define BITS_32 32
 #define BUF_SIZE (BITS_32 + 2)
-
+//AA
 // Define de registros
 #define CS 0
 #define DS 1

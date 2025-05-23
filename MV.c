@@ -14,7 +14,7 @@ void iniciasubrutina(TMV *MV){
     for (i=3;i>=0;i--){
         MV->MEM[posicionfisicaSS--]=MV->punteroargv >> (8*i);
     }
-
+// AA
 
     for (i=3;i>=0;i--){
         MV->MEM[posicionfisicaSS--]=MV->argc >> (8*i);
