@@ -366,6 +366,8 @@ void generaerror(int tipo){
         printf("STACK UNDERFLOW");
     if(tipo==99)
         printf("ERROR APERTURA DE ARCHIVO");
+    if(tipo ==0xF)
+        printf("Error MALLOC");
     abort();
 }
 
@@ -1577,9 +1579,9 @@ void SYS (TMV *MV, TInstruc instruccion){
     El modo de escritura depende de la configuracion almacenada en AL.
 
 */
-    int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso;
+    int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso,base,offset;
     char modo,celdas,size,imprimible;
-    char *bin;
+    char *bin,*auxstr;
     unsigned char Sec,Codreg;
 
 
@@ -1717,15 +1719,36 @@ void SYS (TMV *MV, TInstruc instruccion){
         almacena en un rango de celdas de memoria los datos leídos desde el teclado.
         Almacena lo que se lee en la posición de memoria apuntada por EDX. En CX (16 bits) se especifica la
         cantidad máxima de caracteres a leer. Si CX tiene -1 no se limita la cantidad de caracteres a leer.
-
         */
+        base=direccionamiento_logtofis(*MV,MV->R[EDX]);
+        celdas=MV->R[ECX]&0x0000FFFF;
+        auxstr=malloc(celdas);
+        if(auxstr){
+            fgets(auxstr,sizeof(auxstr),stdin);
+            while(i<=celdas || auxstr[i]!='\0' ){
+                MV->MEM[direccionamiento_logtofis(*MV,base)]=auxstr[i];
+                i++;
+                base++;
+            }
+            free(auxstr);
+        }
+        else
+            generaerror(0xF);
     }
     else if(operando == 4){
         /*
         imprime por pantalla un rango de celdas donde se encuentra un string. Inicia en la
         posición de memoria apuntada por EDX, e imprime hasta encontrar un '\0' (0x00).
-
         */
+        //base=direccionamiento_logtofis(*MV,MV->R[EDX]);
+        //auxstr=malloc(MV->R[ECX]&0x0000FFFF);
+        base=direccionamiento_logtofis(*MV,MV->R[EDX]);
+        imprimible=' ';
+        while(imprimible!='\0'){
+            imprimible=MV->MEM[direccionamiento_logtofis(*MV,base)];
+            printf("%c",imprimible);
+            base+=1;
+        }
     }
     else if(operando==7){
         clearscreen();
