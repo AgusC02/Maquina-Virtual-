@@ -102,6 +102,7 @@ int GuardoValorMemoria(TMV *MV,int Op);
 void EscriboEnMemoria(TMV *MV,int Op, int Valor);
 void modificoCC(TMV *MV,int Resultado);
 void guardoOpB(TMV MV, TInstruc instruc, int *auxOpB);
+void guardoOpA(TMV MV, TInstruc instruc, int *auxOpA); // Para algunas funciones de un solo operando
 char sobrepasaCS(TMV MV,int asignable);
 int devuelveN(TMV *MV);
 int devuelveZ(TMV *MV);
@@ -176,6 +177,7 @@ void STOP(TMV * MV,TInstruc instruc);
 
 // DISSASSEMBLER
 void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
+void EscribeCadenaDissasembler(TMV MV,unsigned short *intPosMemoria);
 void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc,unsigned short int PosInicial,unsigned short int PosMemoria);
 void GuardoSector(char Segmento[4],unsigned char Sec);
 void clearscreen();

@@ -169,7 +169,7 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     //-----------------------
 
     for(i=0;i<argc;i++){
-        printf("vectorindices[%d]= %d \n",i,vectorindices[i]);
+        
         for(j=3;j>=0;j--){
             aux_uchar = vectorindices[i]>>(8*j);
             MV->MEM[memindx]= aux_uchar;
@@ -197,11 +197,9 @@ void dep_arg(int argc, char *argv[], TMV *MV){
    char **vectorparams = NULL;
    int paramsize=0;
 
-
    initparametrosMV(MV);
 
     for (argindx=1; argindx<argc;argindx++){
-
 
         if(strncmp(argv[argindx],"m=",2)==0){ // Checkea m=M
             tammem=atoi(argv[argindx]+2);
@@ -261,6 +259,7 @@ void initregsegmentos(TMV *MV){
         MV->R[i]=-1;
     }
 }
+
 void agregasegmentos(unsigned short int tam, int reg_indx,TMV *MV, int *tds_indx, int sizeac){
     if(tam>0){
         MV->TDS[*tds_indx]=sizeac;
@@ -319,7 +318,8 @@ short int TamCS;
             generaerror(ERRMEM);
 
         MV->R[IP]=(MV->R[CS] & 0xFFFF0000) | header.entrypointoffset;
-        // Habria que checkear si existe SS primero
+        if(MV->R[SS]!=-1)
+            MV->R[SP]=MV->R[SS] + header.tamSS; // Habria que checkear si existe SS primero
         iniciasubrutina(MV); // Puede estar dentro del if de arriba creo.
   }
 }
@@ -397,8 +397,12 @@ void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
     strcpy(VecFunciones[6], "JNP");
     strcpy(VecFunciones[7], "JNN");
     strcpy(VecFunciones[8], "NOT");
+    strcpy(VecFunciones[11], "PUSH");
+    strcpy(VecFunciones[12], "POP");
+    strcpy(VecFunciones[13], "CALL");
 
     //0 Operandos
+    strcpy(VecFunciones[14], "RET");
     strcpy(VecFunciones[15], "STOP");
 
 }
@@ -406,12 +410,12 @@ void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
 void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
     strcpy(VecRegistros[CS], "CS");
     strcpy(VecRegistros[DS], "DS");
-    strcpy(VecRegistros[2], "");
-    strcpy(VecRegistros[3], "");
-    strcpy(VecRegistros[4], "");
+    strcpy(VecRegistros[ES], "ES");
+    strcpy(VecRegistros[SS], "SS");
+    strcpy(VecRegistros[KS], "KS");
     strcpy(VecRegistros[IP], "IP");
-    strcpy(VecRegistros[6], "");
-    strcpy(VecRegistros[7], "");
+    strcpy(VecRegistros[SP], "SP");
+    strcpy(VecRegistros[BP], "BP");
     strcpy(VecRegistros[CC], "CC");
     strcpy(VecRegistros[AC], "AC");
     strcpy(VecRegistros[EAX], "A");
@@ -451,8 +455,12 @@ void declaroFunciones(TFunc Funciones){
   Funciones[6]=JNP;
   Funciones[7]=JNN;
   Funciones[8]=NOT;
+  Funciones[11]=PUSH;
+  Funciones[12]=POP;
+  Funciones[13]=CALL;
 
 //0 OPERANDOS
+  Funciones[14]=RET;
   Funciones[15]=STOP;
 }
 
@@ -600,7 +608,7 @@ int direccionamiento_logtofis(TMV MV, int puntero){
         return -1;        // Aca nunca va a llegar si llama a generaerror, porque la ultima instruccion de la funcion es abort().
     }
     else
-        return DirBase+Offset;
+    return DirBase+Offset;
 }
 
 int posmaxCODESEGMENT(TMV MV){
@@ -627,7 +635,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
     finCS=posmaxCODESEGMENT(*MV);
 
-
+    
     //DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
     while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
@@ -730,22 +738,31 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago l
 }
 
 int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
-    int aux=0,PosMemoria,PosMemoriaFinal,offset,CodReg,puntero;
+    int aux=0,PosMemoria,PosMemoriaFinal,offset,CodReg,puntero,modif;
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
-
+    modif = Op & 0X3;
+    int TamModif = ~modif + 1;
     puntero=(MV).R[CodReg]+offset;
 
     PosMemoria = direccionamiento_logtofis(MV,puntero);
-    PosMemoriaFinal = direccionamiento_logtofis(MV,puntero+4); // Solo lo uso para validar que no se cae del segmento
+    PosMemoriaFinal = direccionamiento_logtofis(MV,puntero+3); // Lo uso para validar que no se cae del segmento
 
-    for (int i=0;i<4;i++){
-        aux+=MV.MEM[PosMemoria];
+    for (int i=0;i<TamModif;i++){
+        aux+=MV.MEM[PosMemoria+TamModif];
         PosMemoria++;
-        if (4-i > 1)
+        if (TamModif-i > 1)
             aux=aux << 8;
     }
+
+
+    /* Creo que no hace fala
+    int corro = (4-TamModif)*8;
+        aux = aux << corro;
+        aux = aux >> corro;
+    }
+    */
 
     return aux;
 }
@@ -753,21 +770,24 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
 void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes de la memoria, se usa solo para el MOV
 
     //HAY QUE CHECKEAR ESTA FUNCION, LA USAMOS MUCHO Y TENEMOS QUE CHECKEAR SI OCURRE FALLO DE SEGMENTO.
-    int offset,CodReg,puntero;
+    int offset,CodReg,modif,puntero;
     int PosMemoria,PosMemoriaFinal;
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
-
+    modif = Op & 0X3;
     puntero=(*MV).R[CodReg]+offset;
 
     PosMemoria = direccionamiento_logtofis(*MV,puntero);
-    PosMemoriaFinal = direccionamiento_logtofis(*MV,puntero+4); // Solo lo uso para validar que no se cae del segmento
+    PosMemoriaFinal = direccionamiento_logtofis(*MV,puntero+3); // Solo lo uso para validar que no se cae del segmento
 
-    for (int i=0;i<4;i++){
+    Valor = Valor << (modif*8);
+    int TamModif = ~modif + 1;
+
+    for (int i=0;i<TamModif;i++){
         MV->MEM[PosMemoria] = (Valor & 0XFF000000) >> 24;
         PosMemoria++;
-        if (4-i > 1)
+        if (TamModif-i > 1)
             Valor=Valor << 8;
     }
 }
@@ -797,6 +817,25 @@ void guardoOpB(TMV MV, TInstruc instruc, int *auxOpB){
       else
         if (instruc.TamB == 3)
             *auxOpB = LeoEnMemoria(MV,instruc.OpB);
+
+}
+
+void guardoOpA(TMV MV, TInstruc instruc, int *auxOpA){  // Para algunas funciones de un solo operando
+    unsigned char SecA,CodOpA;
+    //OPA
+    if (instruc.TamA == 1){
+        DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
+        DefinoAuxRegistro(auxOpA,MV,SecA,CodOpA);
+    }
+    else
+      if (instruc.TamA == 2){  //Inmediato
+         *auxOpA = instruc.OpA;
+         *auxOpA = *auxOpA << 16;
+         *auxOpA = *auxOpA >> 16;
+      }
+      else
+        if (instruc.TamA == 3)
+            *auxOpA = LeoEnMemoria(MV,instruc.OpA);
 
 }
 
@@ -1311,6 +1350,7 @@ void RND(TMV * MV,TInstruc instruc){
         EscriboEnMemoria(MV,instruc.OpA,random);
 
 }
+
 //---------------------------------------------------------------DEBUG-------------------------------------------------------------------
 void muestraheader(theader h){
     printf("%c %c %c %c %c",h.c1,h.c2,h.c3,h.c4,h.c5);
@@ -1324,7 +1364,7 @@ void muestraheader(theader h){
 }
 
 void muestraMVfijos(TMV MV){
-    printf("\n-------FLAG MV \n");
+    printf("\n-------FLAG MV \n");;
     //if(MV.archivovmi)
         //printf("\n archivo vmi: %s",MV.archivovmi);
     printf("\n argc: %d",MV.argc);
@@ -1917,7 +1957,122 @@ void NOT (TMV *MV, TInstruc instruccion){
 
     modificoCC(MV,resultado);
 }
+
+void PUSH(TMV *MV, TInstruc instruccion){
+    int PosSP,InicioSS,guardo=0;
+
+   guardoOpA(*MV,instruccion,&guardo);
+
+ if (MV->R[SP] < MV->R[SS])
+        generaerror(ERRSTOVF);
+    else{
+        InicioSS = ( (MV->TDS[ MV->R[SS]  >> 16] ) >> 16 )  & 0XFFFF;
+        PosSP = InicioSS + (MV->R[SP] & 0XFFFF);  // Apunta al byte más significativo
+        for (int i=0;i<4;i++){ //Recorro los 4 bytes
+            MV->MEM[PosSP] = (guardo & 0XFF000000) >> 24;
+            PosSP++;
+            if (4-i > 1)
+                guardo = guardo << 8;
+        }
+    }
+}
+
+void POP(TMV *MV, TInstruc instruccion) {
+    int guardo=0,TamPila,PosSP;
+    unsigned char SecA,CodOpA;
+    //Primero levanta el dato y luego corre SP (+4)
+
+    //LEVANTO EL DATO
+
+    TamPila = (MV->TDS[(MV->R[SS] >> 16) & 0XFFFF]) & 0XFFFF ; // TamSS
+
+   if ((MV->R[SP] & 0XFFFF) == TamPila)
+        generaerror(ERRSTUNF);
+    else{
+        PosSP = MV->R[SP];
+        for (int i=0;i<4;i++){ //Recorro los 4 bytes ; arranco desde el más significativo (tope de la pila)
+            guardo += MV->MEM[PosSP];
+            PosSP++;
+            if (4 - i > 1)
+                guardo = guardo << 8;
+            MV->R[SP]+=1;
+        }
+    
+        //GUARDO EL DATO
+
+        if (instruccion.TamA == 1){
+            DefinoRegistro(&SecA,&CodOpA,instruccion.OpA);
+            if (SecA == 1) //4 byte
+                MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFFFF00) + (guardo & 0XFF);
+            else
+                    if (SecA == 2){ //3 byte
+                    MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF00FF) + ( (guardo & 0XFF) << 8);
+                     }
+                      else
+                    if (SecA == 3) //3 y 4 byte
+                        MV->R[CodOpA] = (MV->R[CodOpA] & 0XFFFF0000) + (guardo & 0XFFFF);
+                    else{ //Los 4 bytes
+                        MV->R[CodOpA] = (MV->R[CodOpA] & 0X0000000000000000) + guardo;
+                    }
+        }
+        else //Memoria
+            EscriboEnMemoria(MV,instruccion.OpA,guardo);
+    }
+}
+
+void CALL(TMV * MV,TInstruc instruccion){
+  int guardo,InicioSS,PosSP,asignable;
+ 
+if (MV->R[SP] < MV->R[SS])
+        generaerror(ERRSTOVF);
+    else{
+        InicioSS = ( (MV->TDS[ MV->R[SS]  >> 16] ) >> 16 )  & 0XFFFF;
+        PosSP = InicioSS + (MV->R[SP] & 0XFFFF);  // Apunta al byte más significativo
+        for (int i=0;i<4;i++){ //Recorro los 4 bytes
+            MV->MEM[PosSP] = (guardo & 0XFF000000) >> 24;
+            PosSP++;
+            if (4-i > 1)
+                guardo = guardo << 8;
+        }
+
+//SALTO A LA MEMORIA QUE SE INDICA EN OpA
+        guardoOpA(*MV,instruccion,&asignable);
+
+// Antes de asignarle a Ip el asignable tendria que checkear que no salga del CS.
+        if (sobrepasaCS(*MV,asignable)==1)
+            generaerror(ERRSEGMF);
+        else
+            MV->R[IP] = (MV->R[IP] & 0XFFFF0000) + asignable;
+    }
+}
+
+
 // -------------------------------------- FUNCIONES SIN OPERANDO
+
+void RET(TMV * MV,TInstruc instruccion){
+  int guardo=0,TamPila,PosSP;
+   //Primero levanta el dato y luego corre SP (+4)
+
+ //LEVANTO EL DATO
+
+TamPila = (MV->TDS[(MV->R[SS] >> 16) & 0XFFFF]) & 0XFFFF ; // TamSS
+
+    if ((MV->R[SP] & 0XFFFF) == TamPila)
+        generaerror(ERRSTUNF);
+    else{
+        PosSP = MV->R[SP];
+        for (int i=0;i<4;i++){ //Recorro los 4 bytes ; arranco desde el más significativo (tope de la pila)
+            guardo += MV->MEM[PosSP];
+            PosSP++;
+            if (4 - i > 1)
+                guardo = guardo << 8;
+            MV->R[SP]+=1;
+        }
+        //GUARDO EL DATO EN IP
+        MV->R[IP] = guardo;
+    }
+}
+
 void STOP(TMV *MV,TInstruc instruccion){
     exit (0);
 }
@@ -1925,31 +2080,78 @@ void STOP(TMV *MV,TInstruc instruccion){
 void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
 
     unsigned char CodOp;
-    int CantOp;
-    TInstruc instruc;
-    unsigned short int PosInicial,PosMemoria,PosFinal;
+int CantOp,InicioKS,InicioCS,TamKS;
+TInstruc instruc;
+unsigned short int PosInicialCS,PosMemoria=0,PosFinal;
 
-    PosMemoria = direccionamiento_logtofis(MV,MV.R[CS]);
-    PosFinal = posmaxCODESEGMENT(MV);
+    // CONSTANTES
+    if (MV.R[KS] != -1){
+      InicioKS = (MV.TDS[((MV.R[KS] >> 16) & 0XFFFF)] >> 16) & 0XFFFF;
+      TamKS = MV.TDS[((MV.R[KS] >> 16) & 0XFFFF)] & 0XFFFF;
+      PosMemoria = InicioKS;
+      while (PosMemoria < TamKS)
+            EscribeCadenaDissasembler(MV,&PosMemoria);
+    }
+InicioCS = (MV.TDS[((MV.R[CS] >> 16) & 0XFFFF)] >> 16) & 0XFFFF;
+    PosMemoria = InicioCS;
+
+PosFinal = posmaxCODESEGMENT(MV);
     while (PosMemoria < PosFinal) {
-
-        PosInicial=PosMemoria;
+       PosInicialCS=PosMemoria;
         ComponentesInstruccion(MV,PosMemoria,&instruc,&CantOp,&CodOp);
         SeteoValorOp(MV,PosMemoria,&instruc);
 
         PosMemoria += instruc.TamA+instruc.TamB+1; // Posicion de la Siguiente instruccion
-        EscriboDissasembler(MV,VecFunciones,VecRegistros,CodOp,instruc,PosInicial,PosMemoria);
+     EscriboDissasembler(MV,VecFunciones,VecRegistros,CodOp,instruc,PosInicialCS,PosMemoria);
     }
+}
+
+void EscribeCadenaDissasembler(TMV MV,unsigned short int *PosMemoria){
+   int i=0;
+   printf("[%04X] ",*PosMemoria);
+   char Cadena[30]="";
+
+   while ( MV.MEM[*PosMemoria] != 0 ){ //Mientras no se termine el string (\0)
+       if (i == 6)
+          printf("..");
+       else
+          if (i < 6)
+             printf("%02X ",MV.MEM[*PosMemoria]);
+       if ( (MV.MEM[*PosMemoria] > 31) && (MV.MEM[*PosMemoria] != 127) ) //Caracter no imprimible, segun ASCII 127 es supr
+          Cadena[i]=MV.MEM[*PosMemoria];
+       else
+          Cadena[i]='.';
+       *PosMemoria = *PosMemoria + 1;
+       i++;
+   }
+   *PosMemoria = *PosMemoria + 1; //Si encuentro el cero tambien me tengo que adelantar un paso, si no, ciclo infinito
+
+   if (i < 6)
+      printf("00");
+
+   if (i>=5) //Para tabular
+      i=6;
+
+    for (int j=8-i;j>1;j=j-2)
+        printf("\t");
+    printf("| ");
+
+    printf("''");
+    printf("%s",Cadena);
+    printf("'' \n");
+
 }
 
 void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4], unsigned char CodOp, TInstruc instruc ,unsigned short int PosInicial,unsigned short int PosMemoria){
 
     short int Offset;
-    unsigned char CodReg,SecA,SecB;
+    unsigned char CodReg,SecA,SecB,Modif;
     int i;
     char AuxSeg[4];
 
-    printf("[%04X] ",PosInicial); //Muestro posicion de la memoria indicada, hexadecimal de 4 partes , 4 nibbles
+    if (PosInicial == ( ( MV.TDS[(MV.R[IP] & 0XFFFF0000) >> 16] ) >> 16 ) +  (MV.R[IP] & 0XFFFF)) //Entry point
+        printf(">");
+   printf("[%04X] ",PosInicial); //Muestro posicion de la memoria indicada, hexadecimal de 4 partes , 4 nibbles
 
     //Muestro los 8 bits del tipo de instruccion, luego los valores de los operandos
 
@@ -1976,6 +2178,16 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
         if (instruc.TamA == 3) { //Memoria
             CodReg = (instruc.OpA >> 4) & 0xF;
             Offset = (instruc.OpA >> 8) & 0xFFFF;
+            Modif = instruc.OpA & 0X3;
+
+            if (Modif == 0)
+                printf("l");
+            else
+                if (Modif == 2)
+                   printf("w");
+                else
+                   printf("b");
+
             if (CodReg !=0)
               if (CodReg>=10)
                   printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
@@ -2007,8 +2219,19 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
             if (instruc.TamB == 3) {  //Memoria
                 CodReg = (instruc.OpB >> 4) & 0xF;
                 Offset = (instruc.OpB >> 8) & 0xFFFF;
+                Modif = instruc.OpA & 0X3;
+
+                if (Modif == 0)
+                    printf("l");
+                else
+                    if (Modif == 2)
+                        printf("w");
+                    else
+                        printf("b");
+
+
                 if (CodReg>=10)
-                  printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
+                    printf("[%c%s%c+%d]",'E',VecRegistros[CodReg],'X',Offset);
                 else
                     printf("[%s+%d]",VecRegistros[CodReg],Offset);
             }
@@ -2033,6 +2256,7 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
     }
   printf("\n");
 }
+
 void GuardoSector(char Segmento[4],unsigned char Sec){
   if (Sec == 1)
         strcat(Segmento,"L");
