@@ -1995,24 +1995,14 @@ void PUSH(TMV *MV, TInstruc instruccion){
     
 
    guardoOpA(*MV,instruccion,&guardo);
- if (MV->R[SP] < MV->R[SS])
+ if ((MV->R[SP] -4 ) < MV->R[SS])
         generaerror(ERRSTOVF);
     else{
-        /*direccion=direccionamiento_logtofis(*MV,MV->R[SP]);
-        for (i=3;i>=0;i--){
-            MV->MEM[direccion--]= guardo&0xFF;
-            guardo=guardo>>(8*i);
-        }
-        */
        MV->R[SP]-=4;
-       PosSP=direccionamiento_logtofis(*MV,PosSP);
-       for (int i=0;i<4;i++){ //Recorro los 4 bytes
-            MV->MEM[PosSP] = (guardo & 0XFF000000) >> 24;
-            PosSP++;
-            if (4-i > 1)
-                guardo = guardo << 8;
+       PosSP=direccionamiento_logtofis(*MV,MV->R[SP]);
+        for (i=3;i>=0;i--){
+            MV->MEM[PosSP++] = (guardo >> (8*i)) & 0xFF; 
         }
-       
     }
 }
 
@@ -2029,7 +2019,6 @@ void POP(TMV *MV, TInstruc instruccion) {
         generaerror(ERRSTUNF);
     else{
         PosSP = direccionamiento_logtofis(*MV,MV->R[SP]);
-        printf("----FLAG POP posSP=%04X",PosSP);
         for (int i=0;i<4;i++){ //Recorro los 4 bytes ; arranco desde el más significativo (tope de la pila)
             guardo += MV->MEM[PosSP];
             PosSP++;
