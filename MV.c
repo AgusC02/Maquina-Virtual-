@@ -106,7 +106,7 @@ void init_tds0(TMV *MV){
 }
 
 void inicializoMVen0(TMV *MV){
-    int i;
+
 
     init_mem0(MV);
     init_reg0(MV);
@@ -169,7 +169,7 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     //-----------------------
 
     for(i=0;i<argc;i++){
-        
+
         for(j=3;j>=0;j--){
             aux_uchar = vectorindices[i]>>(8*j);
             MV->MEM[memindx]= aux_uchar;
@@ -319,7 +319,7 @@ short int TamCS;
 
         MV->R[IP]=(MV->R[CS] & 0xFFFF0000) | header.entrypointoffset;
         if(MV->R[SS]!=-1)
-            MV->R[SP]=MV->R[SS] + header.tamSS; // Habria que checkear si existe SS primero
+            MV->R[SP]=MV->R[SS] + header.tamSS -1; // Habria que checkear si existe SS primero
         iniciasubrutina(MV); // Puede estar dentro del if de arriba creo.
   }
 }
@@ -637,7 +637,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
     finCS=posmaxCODESEGMENT(*MV);
 
-    
+
     //DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
     while(direccionamiento_logtofis(*MV,MV->R[IP])<finCS){ //MIENTRAS HAYA INSTRUCCIONES PARA LEER (BYTE A BYTE).
         DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
@@ -772,8 +772,9 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
 void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes de la memoria, se usa solo para el MOV
 
     //HAY QUE CHECKEAR ESTA FUNCION, LA USAMOS MUCHO Y TENEMOS QUE CHECKEAR SI OCURRE FALLO DE SEGMENTO.
-    int offset,CodReg,modif,puntero;
-    int PosMemoria,PosMemoriaFinal;
+    int offset,CodReg,puntero;
+    unsigned short int modif;
+    int PosMemoria,PosMemoriaFinal,TamModif;
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
@@ -784,8 +785,8 @@ void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes 
     PosMemoriaFinal = direccionamiento_logtofis(*MV,puntero+3); // Solo lo uso para validar que no se cae del segmento
 
     Valor = Valor << (modif*8);
-    int TamModif = ~modif + 1;
-
+    TamModif = (~modif)&0x3;
+    TamModif+=1;
     for (int i=0;i<TamModif;i++){
         MV->MEM[PosMemoria] = (Valor & 0XFF000000) >> 24;
         PosMemoria++;
@@ -1579,7 +1580,7 @@ void SYS (TMV *MV, TInstruc instruccion){
     El modo de escritura depende de la configuracion almacenada en AL.
 
 */
-    int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso,base,offset;
+    int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso,base;
     char modo,celdas,size,imprimible;
     char *bin,*auxstr;
     unsigned char Sec,Codreg;
@@ -2020,7 +2021,7 @@ void POP(TMV *MV, TInstruc instruccion) {
                 guardo = guardo << 8;
             MV->R[SP]+=1;
         }
-    
+
         //GUARDO EL DATO
 
         if (instruccion.TamA == 1){
@@ -2045,7 +2046,7 @@ void POP(TMV *MV, TInstruc instruccion) {
 
 void CALL(TMV * MV,TInstruc instruccion){
   int guardo,InicioSS,PosSP,asignable;
- 
+
 if (MV->R[SP] < MV->R[SS])
         generaerror(ERRSTOVF);
     else{

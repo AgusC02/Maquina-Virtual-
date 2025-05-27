@@ -171,9 +171,17 @@ void JNN(TMV * MV,TInstruc instruc);
 
 void NOT(TMV * MV,TInstruc instruc);
 
+void PUSH(TMV * MV,TInstruc instruc);
+
+void POP(TMV * MV,TInstruc instruc);
+
+void CALL(TMV * MV,TInstruc instruc);
+
 //0 OPERANDOS
 
 void STOP(TMV * MV,TInstruc instruc);
+
+void RET(TMV * MV,TInstruc instruc);
 
 // DISSASSEMBLER
 void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);

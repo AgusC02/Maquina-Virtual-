@@ -28,7 +28,10 @@ int main(int argc, char *argv[]){
     LeoInstruccion(&MV);
     */
 
+    if(MV.disassembler)
+        LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
     LeoInstruccion(&MV);
+
     //PARA DEBUGEAR
     //muestravaloresmv(MV);
     free(MV.archivovmi);
