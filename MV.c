@@ -4,7 +4,7 @@
 #include "MV.h"
 
 void iniciasubrutina(TMV *MV){
-    int posicionfisicaSP,i;
+    int posicionfisicaSP,i,aux;
     // Habria que preguntar que pasa si se define el stack segment como 0, que pasaria con la subrutina principal.
     posicionfisicaSP=direccionamiento_logtofis(*MV,(*MV).R[SP]);
 
@@ -12,28 +12,31 @@ void iniciasubrutina(TMV *MV){
 
     //Coloca en la pila el puntero a memoria byte por byte. Lo hago a mano pero despues podemos armar el operando y hacer push.
     for (i=3;i>=0;i--){
-        MV->MEM[posicionfisicaSP--]=MV->punteroargv >> (8*i);
+        aux=MV->punteroargv;
+        MV->MEM[posicionfisicaSP--]=aux & 0xFF;
+        aux=aux>> (8*i);
     }
 
 
     for (i=3;i>=0;i--){
-        MV->MEM[posicionfisicaSP--]=MV->argc >> (8*i);
+        aux=MV->argc;
+        MV->MEM[posicionfisicaSP--]=aux & 0xFF;
+        aux=aux >> (8*i);
     }
 
-    for (i=3;i>=0;i--){ //AGREGA EL RET -1
+    for (i=3;i>=0;i--){ //AGREGA EL RET -1 (-1 siempre)
         MV->MEM[posicionfisicaSP--]=0xFF;
     }
 
-    MV->R[SP]-=12;
+    MV->R[SP]-=11;
+    printf("direccion de SP=%04X",direccionamiento_logtofis(*MV,MV->R[SP]));
 
 }
 
 void mododebug(TMV *MV){
     char comando;
 
-    comando = getchar();
-    while (getchar() != '\n'); // limpiar buffer
-
+    comando=getchar();
     if (comando == 'q') {
         exit(0);
     } else if (comando == 'g') {
@@ -48,12 +51,11 @@ void generarImagen(TMV MV){
     FILE *f;
     unsigned char mem_kib;
     unsigned int reg;
-
     f=fopen(MV.archivovmi,"wb");
 
     if(!f){
         printf("ERROR AL ABRIR ARCHIVO DE IMAGEN \n");
-        exit(1);
+        generaerror(99);
     }
 
     fwrite("VMI25",1,5,f);
@@ -645,7 +647,7 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
 
         ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp); //TIPO INSTRUCCION, identifico los tipos y cantidad de operadores y el codigo de operacion
 
-        if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=15))) ){ // Si el codigo de operacion es validod
+        if ((CodOp >= 0) && ((CodOp <= 8) || ((CodOp<=30) && (CodOp>=11))) ){ // Si el codigo de operacion es validod
             if (CantOp != 0) //Guardo los operandos que actuan en un auxiliar, y tambien guardo el tamanio del operando
                SeteoValorOp(*MV, DirFisicaActual, &instruc); // Distingue entre uno o dos operandos a setear
            // TENGO QUE IDENTIFICAR LA FUNCION QUE TOCA CON CODOP Y USAR UN VECTOR DE LOS OPERANDOS
@@ -653,8 +655,9 @@ void LeoInstruccion(TMV* MV){ //Por ahora op1,op2,CodOp los dejo pero probableme
            //Avanzo a la proxima instruccion. FIX: Mueve el puntero de IP antes de llamar a la funcion, asi funcionan los SALTOS.
             MV->R[IP]=MV->R[IP]+instruc.TamA+instruc.TamB+1;
             Funciones[CodOp](MV,instruc);
-        }else
+        }else{
             generaerror(ERRINVINST);
+        }
         if (MV->flagdebug && (MV->archivovmi != NULL)) {
                 generarImagen(*MV);
                 mododebug(MV);
@@ -740,22 +743,26 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago l
 }
 
 int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
-    int aux=0,PosMemoria,PosMemoriaFinal,offset,CodReg,puntero,modif;
+    int aux=0,PosMemoria,PosMemoriaFinal,offset,CodReg,puntero;
+    unsigned short int modif;
+    int TamModif;
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
     modif = Op & 0X3;
-    int TamModif = ~modif + 1;
+    TamModif = (~modif)&0x3;
+    TamModif+=1;
     puntero=(MV).R[CodReg]+offset;
 
     PosMemoria = direccionamiento_logtofis(MV,puntero);
     PosMemoriaFinal = direccionamiento_logtofis(MV,puntero+3); // Lo uso para validar que no se cae del segmento
 
+
     for (int i=0;i<TamModif;i++){
-        aux+=MV.MEM[PosMemoria+TamModif];
-        PosMemoria++;
+        aux+=MV.MEM[PosMemoria]; 
+        PosMemoria++; 
         if (TamModif-i > 1)
-            aux=aux << 8;
+            aux=aux << 8; 
     }
 
 
@@ -1760,8 +1767,9 @@ void SYS (TMV *MV, TInstruc instruccion){
             MV->flagdebug=1;
         }
     }
-    else
-        generaerror(ERRINVINST); //ESTO NO SE SI SE HACE PERO BUENO.
+    else{
+        generaerror(ERRINVINST);
+        } //ESTO NO SE SI SE HACE PERO BUENO.
 }
 
 void JMP (TMV *MV,TInstruc instruccion){
@@ -1983,21 +1991,28 @@ void NOT (TMV *MV, TInstruc instruccion){
 }
 
 void PUSH(TMV *MV, TInstruc instruccion){
-    int PosSP,InicioSS,guardo=0;
+    int PosSP,InicioSS,direccion,i,guardo=0;
+    
 
    guardoOpA(*MV,instruccion,&guardo);
-
  if (MV->R[SP] < MV->R[SS])
         generaerror(ERRSTOVF);
     else{
-        InicioSS = ( (MV->TDS[ MV->R[SS]  >> 16] ) >> 16 )  & 0XFFFF;
-        PosSP = InicioSS + (MV->R[SP] & 0XFFFF);  // Apunta al byte más significativo
-        for (int i=0;i<4;i++){ //Recorro los 4 bytes
+        /*direccion=direccionamiento_logtofis(*MV,MV->R[SP]);
+        for (i=3;i>=0;i--){
+            MV->MEM[direccion--]= guardo&0xFF;
+            guardo=guardo>>(8*i);
+        }
+        */
+       MV->R[SP]-=4;
+       PosSP=direccionamiento_logtofis(*MV,PosSP);
+       for (int i=0;i<4;i++){ //Recorro los 4 bytes
             MV->MEM[PosSP] = (guardo & 0XFF000000) >> 24;
             PosSP++;
             if (4-i > 1)
                 guardo = guardo << 8;
         }
+       
     }
 }
 
@@ -2013,7 +2028,8 @@ void POP(TMV *MV, TInstruc instruccion) {
    if ((MV->R[SP] & 0XFFFF) == TamPila)
         generaerror(ERRSTUNF);
     else{
-        PosSP = MV->R[SP];
+        PosSP = direccionamiento_logtofis(*MV,MV->R[SP]);
+        printf("----FLAG POP posSP=%04X",PosSP);
         for (int i=0;i<4;i++){ //Recorro los 4 bytes ; arranco desde el más significativo (tope de la pila)
             guardo += MV->MEM[PosSP];
             PosSP++;
