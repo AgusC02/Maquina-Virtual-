@@ -29,7 +29,6 @@ void iniciasubrutina(TMV *MV){
     }
 
     MV->R[SP]-=11;
-    printf("direccion de SP=%04X",direccionamiento_logtofis(*MV,MV->R[SP]));
 
 }
 
@@ -745,7 +744,7 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago l
 int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en un auxiliar
     int aux=0,PosMemoria,PosMemoriaFinal,offset,CodReg,puntero;
     unsigned short int modif;
-    int TamModif;
+    int TamModif,corro;
 
     offset=Op>>8;
     CodReg=(Op>>4)&0xF;
@@ -759,19 +758,18 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
 
 
     for (int i=0;i<TamModif;i++){
-        aux+=MV.MEM[PosMemoria]; 
-        PosMemoria++; 
+        aux+=MV.MEM[PosMemoria];
+        PosMemoria++;
         if (TamModif-i > 1)
-            aux=aux << 8; 
+            aux=aux << 8;
     }
 
 
-    /* Creo que no hace fala
-    int corro = (4-TamModif)*8;
-        aux = aux << corro;
-        aux = aux >> corro;
-    }
-    */
+    corro = (4-TamModif)*8;
+    aux = aux << corro;
+    aux = aux >> corro;
+
+
 
     return aux;
 }
@@ -1124,7 +1122,6 @@ void CMP(TMV * MV,TInstruc instruc){
     }
      else //Memoria
         resultado = LeoEnMemoria(*MV,instruc.OpA) - resta;
-
 
     modificoCC(MV,resultado);
 }
@@ -1589,7 +1586,8 @@ void SYS (TMV *MV, TInstruc instruccion){
 */
     int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso,base;
     char modo,celdas,size,imprimible;
-    char *bin,*auxstr;
+    char *bin;
+    char auxstr[100];
     unsigned char Sec,Codreg;
 
 
@@ -1730,39 +1728,41 @@ void SYS (TMV *MV, TInstruc instruccion){
         */
         base=direccionamiento_logtofis(*MV,MV->R[EDX]);
         celdas=MV->R[ECX]&0x0000FFFF;
-        auxstr=malloc(celdas);
-        if(auxstr){
-            fgets(auxstr,sizeof(auxstr),stdin);
+
+            //fgets(auxstr,sizeof(auxstr),stdin);
+            i=0;
+            fflush(stdin);
+            fgets(auxstr,100,stdin);
+            printf("-----AUXSTR : %s",auxstr);
             while(i<=celdas || auxstr[i]!='\0' ){
                 MV->MEM[direccionamiento_logtofis(*MV,base)]=auxstr[i];
                 i++;
                 base++;
             }
-            free(auxstr);
-        }
-        else
-            generaerror(0xF);
+            printf("\n----------FLAG auxstr= %s",auxstr);
+
     }
     else if(operando == 4){
         /*
         imprime por pantalla un rango de celdas donde se encuentra un string. Inicia en la
         posición de memoria apuntada por EDX, e imprime hasta encontrar un '\0' (0x00).
         */
-        //base=direccionamiento_logtofis(*MV,MV->R[EDX]);
-        //auxstr=malloc(MV->R[ECX]&0x0000FFFF);
-        base=direccionamiento_logtofis(*MV,MV->R[EDX]);
-        imprimible=' ';
+
+        base=0;
+        imprimible=MV->MEM[direccionamiento_logtofis(*MV,MV->R[EDX]+base)];
         while(imprimible!='\0'){
-            imprimible=MV->MEM[direccionamiento_logtofis(*MV,base)];
-            printf("%c",imprimible);
-            base+=1;
+                //printf("%c %s",imprimible,"F");
+                putchar(imprimible);
+                base+=1;
+                imprimible=MV->MEM[direccionamiento_logtofis(*MV,MV->R[EDX]+base)];
+                //printf("\n [%04X]",direccionamiento_logtofis(*MV,MV->R[EDX]+base));
+
         }
     }
     else if(operando==7){
         clearscreen();
     }
     else if(operando==0xF){
-
         if(MV->archivovmi != NULL){
             MV->flagdebug=1;
         }
@@ -1793,7 +1793,7 @@ void JMP (TMV *MV,TInstruc instruccion){
     if (sobrepasaCS(*MV,asignable)==1)
         generaerror(ERRSEGMF);
 
-    MV->R[IP]=asignable;
+    MV->R[IP] = (MV->R[IP] & 0XFFFF0000) + asignable;
 
 }
 
@@ -1818,7 +1818,7 @@ void JZ (TMV *MV,TInstruc instruccion){
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(ERRSEGMF);
 
-        MV->R[IP]=asignable;
+         MV->R[IP] = (MV->R[IP] & 0XFFFF0000) + asignable;
     }
 }
 
@@ -1842,7 +1842,7 @@ void JP (TMV *MV,TInstruc instruccion){
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(ERRSEGMF);
 
-        MV->R[IP]=asignable;
+        MV->R[IP] = (MV->R[IP] & 0XFFFF0000) + asignable;
     }
 }
 
@@ -1866,7 +1866,7 @@ void JN (TMV *MV,TInstruc instruccion){
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(ERRSEGMF);
 
-        MV->R[IP]=asignable;
+        MV->R[IP] = (MV->R[IP] & 0XFFFF0000) + asignable;
     }
 }
 
@@ -1890,7 +1890,7 @@ void JNZ (TMV *MV,TInstruc instruccion){
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(ERRSEGMF);
 
-        MV->R[IP]=asignable;
+        MV->R[IP] = (MV->R[IP] & 0XFFFF0000) + asignable;
     }
 }
 
@@ -1914,7 +1914,7 @@ void JNP (TMV *MV, TInstruc instruccion){
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(ERRSEGMF);
 
-        MV->R[IP]=asignable;
+        MV->R[IP] = (MV->R[IP] & 0XFFFF0000) + asignable;
     }
 }
 
@@ -1938,7 +1938,7 @@ void JNN (TMV *MV, TInstruc instruccion){
         if (sobrepasaCS(*MV,asignable)==1)
             generaerror(ERRSEGMF);
 
-        MV->R[IP]=asignable;
+        MV->R[IP] = (MV->R[IP] & 0XFFFF0000) + asignable;
     }
 }
 
@@ -1992,7 +1992,7 @@ void NOT (TMV *MV, TInstruc instruccion){
 
 void PUSH(TMV *MV, TInstruc instruccion){
     int PosSP,InicioSS,direccion,i,guardo=0;
-    
+
 
    guardoOpA(*MV,instruccion,&guardo);
  if ((MV->R[SP] -4 ) < MV->R[SS])
@@ -2001,7 +2001,7 @@ void PUSH(TMV *MV, TInstruc instruccion){
        MV->R[SP]-=4;
        PosSP=direccionamiento_logtofis(*MV,MV->R[SP]);
         for (i=3;i>=0;i--){
-            MV->MEM[PosSP++] = (guardo >> (8*i)) & 0xFF; 
+            MV->MEM[PosSP++] = (guardo >> (8*i)) & 0xFF;
         }
     }
 }
@@ -2149,7 +2149,7 @@ void EscribeCadenaDissasembler(TMV MV,unsigned short int *PosMemoria){
        if ( (MV.MEM[*PosMemoria] > 31) && (MV.MEM[*PosMemoria] != 127) ) //Caracter no imprimible, segun ASCII 127 es supr
           Cadena[i]=MV.MEM[*PosMemoria];
        else
-          Cadena[i]='.';
+            Cadena[i]='.';
        *PosMemoria = *PosMemoria + 1;
        i++;
    }
