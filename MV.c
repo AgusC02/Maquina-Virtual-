@@ -566,7 +566,6 @@ void LeoArch(char nomarch[],TMV *MV){
         //SI ENTRO ACA ES PORQUE TENGO Q BASARME EN LA IMAGEN
         inicializoMVen0(MV);
         MV->mem_size=headervmi.mem_size * 1024;
-        printf("mv->mem_size= %04X (%d)\n",MV->mem_size,MV->mem_size);
         for(i=0;i<CANTREG;i++){ //LEO LOS REGISTROS
             for(j=0;j<4;j++){
                 fread(&leo,sizeof(char),1,arch);
