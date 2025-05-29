@@ -9,9 +9,6 @@ void iniciasubrutina(TMV *MV){
     posicionfisicaSP=direccionamiento_logtofis(*MV,(*MV).R[SP]);
 
     // Posicionfisica SP apunta a la ultima direccion posible de memoria
-    //printf("\n----FLAG iniciasubrut\n");
-    //printf("MV->punteroargv = %04X\n",MV->punteroargv);
-    //printf("MV->argc = %d",MV->argc);
     //Coloca en la pila el puntero a memoria byte por byte. Lo hago a mano pero despues podemos armar el operando y hacer push.
     aux=MV->punteroargv;
     for (i=3;i>=0;i--){
@@ -149,7 +146,6 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     memindx=0;
     //sizestr=0;
     for (i=0;i<argc;i++){
-        //printf("\n-------FLAG EN armaParamSegment: argv[%d]= %s\n",i,argv[i]);
         sizestr=0;
         sizestr+=(strlen(argv[i])+1);
         auxiliar=malloc(strlen(argv[i]+1));
@@ -252,7 +248,6 @@ void dep_arg(int argc, char *argv[], TMV *MV){
             strcpy(MV->archivovmi,archivo_vmi);
         }
     }
-
     LeoArch(archivo,MV);
     free(archivo_vmi);
     free(archivo_vmx);
@@ -570,11 +565,12 @@ void LeoArch(char nomarch[],TMV *MV){
         headervmi.mem_size=header.tamCS;
         //SI ENTRO ACA ES PORQUE TENGO Q BASARME EN LA IMAGEN
         inicializoMVen0(MV);
-        MV->mem_size=headervmi.mem_size;
+        MV->mem_size=headervmi.mem_size * 1024;
+        printf("mv->mem_size= %04X (%d)\n",MV->mem_size,MV->mem_size);
         for(i=0;i<CANTREG;i++){ //LEO LOS REGISTROS
             for(j=0;j<4;j++){
                 fread(&leo,sizeof(char),1,arch);
-                MV->R[i]<<=4;
+                MV->R[i]<<=8;
                 MV->R[i]|=leo;
             }
         }
@@ -582,11 +578,10 @@ void LeoArch(char nomarch[],TMV *MV){
         for(i=0;i<CANTMAXSEGMENTOS;i++){
             for(j=0;j<4;j++){
                 fread(&leo,sizeof(char),1,arch);
-                MV->TDS[i] <<= 4;
+                MV->TDS[i] <<= 8;
                 MV->TDS[i] |= leo;
             }
         }
-
         for(i=0;i<MV->mem_size;i++){
             fread(&leo,sizeof(char),1,arch);
             MV->MEM[i]=leo;
@@ -742,7 +737,7 @@ void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago l
             else
                 *AuxR = MV.R[CodReg];
 
-    printf("\n----FLAG AuxR= %08X (%d)\n",*AuxR,*AuxR);
+
 
 }
 
@@ -760,7 +755,6 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
 
     PosMemoria = direccionamiento_logtofis(MV,puntero);
     PosMemoriaFinal = direccionamiento_logtofis(MV,puntero+3); // Lo uso para validar que no se cae del segmento
-
 
     for (int i=0;i<TamModif;i++){
         aux+=MV.MEM[PosMemoria];
@@ -786,22 +780,15 @@ void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes 
     unsigned short int modif;
     int PosMemoria,PosMemoriaFinal,TamModif;
 
-    //printf("\n---FLAG Entra EscriboEnMemoria\n");
     offset=Op>>8; //Corrimiento porque offset puede ser negativo
     offset<<=16;
     offset>>=16;
-    //printf("offset= %08X (%d)\n",offset,offset);
     CodReg=(Op>>4)&0xF;
-    //printf("CodReg= %08X\n",CodReg);
     modif = Op & 0X3;
-    //printf("Modif = %04X\n",modif);
     puntero=(*MV).R[CodReg]+offset;
-    //printf("puntero= %08X\n",puntero);
     PosMemoria = direccionamiento_logtofis(*MV,puntero);
-    //printf("\n----FLAG EscriboEnMemoria pasa PosMemoria\n");
     PosMemoriaFinal = direccionamiento_logtofis(*MV,puntero+3); // Solo lo uso para validar que no se cae del segmento
 
-    //printf("\n----FLAG EscriboEnMemoria pasa PosMemoriaFinal\n");
     Valor = Valor << (modif*8);
     TamModif = (~modif)&0x3;
     TamModif+=1;
@@ -865,8 +852,6 @@ void MOV(TMV * MV,TInstruc instruc){
     unsigned char SecA,CodOpA; //CodOp es unsigned char, no?
     //OPB
     guardoOpB(*MV,instruc,&mover);
-    //printf("\n-----FLAG MOV\n");
-    //printf("mover= %08X\n",mover);
 
     //OPA
     if (instruc.TamA == 1){ //Si Op1 es de registro, debo cambiar la posicion de memoria del registro por la que me diga el Op1
