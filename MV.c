@@ -2115,9 +2115,9 @@ void STOP(TMV *MV,TInstruc instruccion){
 void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
 
     unsigned char CodOp;
-int CantOp,InicioKS,InicioCS,TamKS;
-TInstruc instruc;
-unsigned short int PosInicialCS,PosMemoria=0,PosFinal;
+    int CantOp,InicioKS,InicioCS,TamKS;
+    TInstruc instruc;
+    unsigned short int PosInicialCS,PosMemoria=0,PosFinal;
 
     // CONSTANTES
     if (MV.R[KS] != -1){
@@ -2127,10 +2127,10 @@ unsigned short int PosInicialCS,PosMemoria=0,PosFinal;
       while (PosMemoria < TamKS)
             EscribeCadenaDissasembler(MV,&PosMemoria);
     }
-InicioCS = (MV.TDS[((MV.R[CS] >> 16) & 0XFFFF)] >> 16) & 0XFFFF;
+    InicioCS = (MV.TDS[((MV.R[CS] >> 16) & 0XFFFF)] >> 16) & 0XFFFF;
     PosMemoria = InicioCS;
 
-PosFinal = posmaxCODESEGMENT(MV);
+    PosFinal = posmaxCODESEGMENT(MV);
     while (PosMemoria < PosFinal) {
        PosInicialCS=PosMemoria;
         ComponentesInstruccion(MV,PosMemoria,&instruc,&CantOp,&CodOp);
@@ -2221,7 +2221,8 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
                 if (Modif == 2)
                    printf("w");
                 else
-                   printf("b");
+                   if (Modif == 3)
+                        printf("b");
 
             if (CodReg !=0)
               if (CodReg>=10)
@@ -2254,7 +2255,7 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
             if (instruc.TamB == 3) {  //Memoria
                 CodReg = (instruc.OpB >> 4) & 0xF;
                 Offset = (instruc.OpB >> 8) & 0xFFFF;
-                Modif = instruc.OpA & 0X3;
+                Modif = instruc.OpB & 0X3;
 
                 if (Modif == 0)
                     printf("l");
@@ -2262,7 +2263,8 @@ void EscriboDissasembler(TMV MV, char VecFunciones[CANTFUNC][5],char VecRegistro
                     if (Modif == 2)
                         printf("w");
                     else
-                        printf("b");
+                        if (Modif == 3)
+                            printf("b");
 
 
                 if (CodReg>=10)
