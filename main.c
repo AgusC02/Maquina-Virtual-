@@ -27,7 +27,7 @@ int main(int argc, char *argv[]){
     }
     LeoInstruccion(&MV);
     */
-
+    generarImagen(MV);
     if(MV.disassembler)
         LeoInstruccionesDissasembler(MV,VecFunciones,VecRegistros);
     LeoInstruccion(&MV);

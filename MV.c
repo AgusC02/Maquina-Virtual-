@@ -9,17 +9,20 @@ void iniciasubrutina(TMV *MV){
     posicionfisicaSP=direccionamiento_logtofis(*MV,(*MV).R[SP]);
 
     // Posicionfisica SP apunta a la ultima direccion posible de memoria
-
+    //printf("\n----FLAG iniciasubrut\n");
+    //printf("MV->punteroargv = %04X\n",MV->punteroargv);
+    //printf("MV->argc = %d",MV->argc);
     //Coloca en la pila el puntero a memoria byte por byte. Lo hago a mano pero despues podemos armar el operando y hacer push.
+    aux=MV->punteroargv;
     for (i=3;i>=0;i--){
-        aux=MV->punteroargv;
+        //aux=MV->punteroargv;
         MV->MEM[posicionfisicaSP--]=aux & 0xFF;
-        aux=aux>> (8*i);
+        aux=aux >> (8*i);
     }
 
-
+    aux=MV->argc;
     for (i=3;i>=0;i--){
-        aux=MV->argc;
+        //aux=MV->argc;
         MV->MEM[posicionfisicaSP--]=aux & 0xFF;
         aux=aux >> (8*i);
     }
@@ -144,11 +147,12 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     unsigned char aux_uchar;
 
     memindx=0;
+    //sizestr=0;
     for (i=0;i<argc;i++){
+        //printf("\n-------FLAG EN armaParamSegment: argv[%d]= %s\n",i,argv[i]);
         sizestr=0;
-
         sizestr+=(strlen(argv[i])+1);
-        auxiliar=malloc(sizestr);
+        auxiliar=malloc(strlen(argv[i]+1));
         strcpy(auxiliar,argv[i]);
 
         vectorindices[i]=memindx;
@@ -719,25 +723,26 @@ void DefinoRegistro(unsigned char *Sec , unsigned char *CodReg, int Op){  //Defi
 
 void DefinoAuxRegistro(int *AuxR,TMV MV,unsigned char Sec,int CodReg){ //Apago las posiciones del registro de 32 bytes en el que asignare a otro registro/memoria
   int CorroSigno=0;
+  signed char charlocal=0;
+  signed short int shortlocal=0;
   if (Sec == 1){
-        *AuxR = MV.R[CodReg] & 0XFF;
-        CorroSigno = 24;
+        charlocal = MV.R[CodReg] & 0XFF;
+        *AuxR=charlocal;
     }
       else
         if (Sec == 2){
-          *AuxR = (MV.R[CodReg] & 0XFF00) >> 8;
-          CorroSigno = 16;
+         charlocal=(MV.R[CodReg]>>8 & 0XFF);
+         *AuxR=charlocal;
         }
           else
             if (Sec == 3){
-              *AuxR = MV.R[CodReg] & 0XFFFF;
-              CorroSigno = 16;
+              shortlocal=MV.R[CodReg] & 0XFFFF;
+              *AuxR=shortlocal;
             }
             else
                 *AuxR = MV.R[CodReg];
 
-    *AuxR = *AuxR << CorroSigno;
-    *AuxR = *AuxR >> CorroSigno;
+    printf("\n----FLAG AuxR= %08X (%d)\n",*AuxR,*AuxR);
 
 }
 
@@ -781,14 +786,22 @@ void EscriboEnMemoria(TMV *MV,int Op, int Valor){ // Guarda el valor en 4 bytes 
     unsigned short int modif;
     int PosMemoria,PosMemoriaFinal,TamModif;
 
-    offset=Op>>8;
+    //printf("\n---FLAG Entra EscriboEnMemoria\n");
+    offset=Op>>8; //Corrimiento porque offset puede ser negativo
+    offset<<=16;
+    offset>>=16;
+    //printf("offset= %08X (%d)\n",offset,offset);
     CodReg=(Op>>4)&0xF;
+    //printf("CodReg= %08X\n",CodReg);
     modif = Op & 0X3;
+    //printf("Modif = %04X\n",modif);
     puntero=(*MV).R[CodReg]+offset;
-
+    //printf("puntero= %08X\n",puntero);
     PosMemoria = direccionamiento_logtofis(*MV,puntero);
+    //printf("\n----FLAG EscriboEnMemoria pasa PosMemoria\n");
     PosMemoriaFinal = direccionamiento_logtofis(*MV,puntero+3); // Solo lo uso para validar que no se cae del segmento
 
+    //printf("\n----FLAG EscriboEnMemoria pasa PosMemoriaFinal\n");
     Valor = Valor << (modif*8);
     TamModif = (~modif)&0x3;
     TamModif+=1;
@@ -852,6 +865,8 @@ void MOV(TMV * MV,TInstruc instruc){
     unsigned char SecA,CodOpA; //CodOp es unsigned char, no?
     //OPB
     guardoOpB(*MV,instruc,&mover);
+    //printf("\n-----FLAG MOV\n");
+    //printf("mover= %08X\n",mover);
 
     //OPA
     if (instruc.TamA == 1){ //Si Op1 es de registro, debo cambiar la posicion de memoria del registro por la que me diga el Op1
@@ -1108,21 +1123,31 @@ void CMP(TMV * MV,TInstruc instruc){
     //OPA
     if (instruc.TamA == 1){
         DefinoRegistro(&SecA,&CodOpA,instruc.OpA);
-        if (SecA == 1)
+        if (SecA == 1){
             resultado = ( ( (MV->R[CodOpA] & 0x000000FF) - (resta & 0XFF) ) & 0XFF );
+            resultado<<=24;
+            resultado>>=24;
+        }
         else
-            if (SecA == 2)
+            if (SecA == 2){
                 resultado = ( ( (MV->R[CodOpA] & 0x0000FF00) - ( (resta & 0XFF) << 8) ) & 0x0000FF00) >> 8;
+                resultado<<=16;
+                resultado>>=16;
+            }
             else
-                if (SecA == 3)
+                if (SecA == 3){
                     resultado = ( ( (MV->R[CodOpA] & 0x0000FFFF) -  (resta & 0XFFFF) ) & 0x0000FFFF) ;
+                    resultado<<=16;
+                    resultado>>=16;
+                }
                 else
                     resultado = MV->R[CodOpA] - resta;
 
     }
-     else //Memoria
-        resultado = LeoEnMemoria(*MV,instruc.OpA) - resta;
-
+     else{ //Memoria
+        resultado = LeoEnMemoria(*MV,instruc.OpA);
+        resultado-=resta;
+     }
     modificoCC(MV,resultado);
 }
 
@@ -1584,10 +1609,12 @@ void SYS (TMV *MV, TInstruc instruccion){
     El modo de escritura depende de la configuracion almacenada en AL.
 
 */
-    int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso,base;
+    int i,j,operando,pos_inicial_memoria,numero,pos_max_acceso,base,punteroedx;
+    short int cx,nbytes;
     char modo,celdas,size,imprimible;
     char *bin;
-    char auxstr[100];
+    char *auxstr;
+
     unsigned char Sec,Codreg;
 
 
@@ -1602,16 +1629,6 @@ void SYS (TMV *MV, TInstruc instruccion){
     }
     else
         operando=LeoEnMemoria(*MV,instruccion.OpA);
-
-    //SETEO VALORES -> Lo paso a una funcion
-
-    /*modo= MV->R[EAX]& 0xFF;
-    celdas= MV->R[ECX]& 0xFF;
-    size= (MV->R[ECX]>>8)& 0xFF;
-    pos_inicial_memoria=direccionamiento_logtofis(*MV,MV->R[EDX]);
-
-    pos_max_acceso=direccionamiento_logtofis(*MV,MV->R[EDX]+celdas*size); // Para verificar fallo de segmento.
-    */
 
     if(operando==1){//READ
         setvaloresSYS(*MV,&modo,&celdas,&size,&pos_inicial_memoria,&pos_max_acceso);
@@ -1683,15 +1700,7 @@ void SYS (TMV *MV, TInstruc instruccion){
                 numero = numero<<8;
                 numero |= (*MV).MEM[pos_inicial_memoria++];
             }
-            /*  IMPLEMENTADO CON UN FOR SERIA:
-                if (size >= 1 && size <= 4) {
-                // Leo el primer byte sin desplazar
-                numero = (*MV).MEM[pos_inicial_memoria++];
-                // Para cada byte adicional, desplazo y concateno
-                for (int i = 1; i < size; ++i) {
-                    numero = (numero << 8) | (*MV).MEM[pos_inicial_memoria++];
-                }
-            */
+
             if(modo&0x10){
                 //Funcion que toma el numero (entero de 32 bits) y lo transforma en un string con formato 0b numero
                 bin = int_to_c2bin(numero);
@@ -1726,21 +1735,29 @@ void SYS (TMV *MV, TInstruc instruccion){
         Almacena lo que se lee en la posición de memoria apuntada por EDX. En CX (16 bits) se especifica la
         cantidad máxima de caracteres a leer. Si CX tiene -1 no se limita la cantidad de caracteres a leer.
         */
-        base=direccionamiento_logtofis(*MV,MV->R[EDX]);
-        celdas=MV->R[ECX]&0x0000FFFF;
 
-            //fgets(auxstr,sizeof(auxstr),stdin);
+        punteroedx=MV->R[EDX];
+        cx=MV->R[ECX]&0x0000FFFF;
+        if(cx==0) //Validacion por si el programador assembler es limitado ;)
+            generaerror(0xF);
+       nbytes=(cx==-1)? 100 : cx;
+       auxstr=malloc(nbytes*sizeof(char)+1);
+       if(auxstr){
+            fgets(auxstr,nbytes*sizeof(char)+1,stdin);
+            auxstr[strcspn(auxstr, "\n")] = '\0';
+
             i=0;
-            fflush(stdin);
-            fgets(auxstr,100,stdin);
-            printf("-----AUXSTR : %s",auxstr);
-            while(i<=celdas || auxstr[i]!='\0' ){
-                MV->MEM[direccionamiento_logtofis(*MV,base)]=auxstr[i];
+            while(i<nbytes && auxstr[i]!='\0'){
+                MV->MEM[direccionamiento_logtofis(*MV,punteroedx)]=auxstr[i];
+                punteroedx++;
                 i++;
-                base++;
             }
-            printf("\n----------FLAG auxstr= %s",auxstr);
-
+            //Agrego el \0.
+            MV->MEM[direccionamiento_logtofis(*MV,punteroedx)]='\0';
+            free(auxstr);
+       }
+       else
+            generaerror(0xF);
     }
     else if(operando == 4){
         /*
@@ -2050,18 +2067,23 @@ void POP(TMV *MV, TInstruc instruccion) {
 }
 
 void CALL(TMV * MV,TInstruc instruccion){
-  int guardo,InicioSS,PosSP,asignable;
+  int guardo,InicioSS,PosSP,PosSS,asignable;
 
-if (MV->R[SP] < MV->R[SS])
+    MV->R[SP]-=4;
+    PosSP=direccionamiento_logtofis(*MV,MV->R[SP]);
+    PosSS=direccionamiento_logtofis(*MV,MV->R[SS]);
+    guardo=MV->R[IP];
+  if (PosSP < PosSS)
         generaerror(ERRSTOVF);
     else{
-        InicioSS = ( (MV->TDS[ MV->R[SS]  >> 16] ) >> 16 )  & 0XFFFF;
-        PosSP = InicioSS + (MV->R[SP] & 0XFFFF);  // Apunta al byte más significativo
-        for (int i=0;i<4;i++){ //Recorro los 4 bytes
+        /*for (int i=0;i<4;i++){ //Recorro los 4 bytes
             MV->MEM[PosSP] = (guardo & 0XFF000000) >> 24;
             PosSP++;
             if (4-i > 1)
                 guardo = guardo << 8;
+        }*/
+        for (int i=3;i>=0;i--){
+            MV->MEM[PosSP++] = (guardo >> (8*i)) & 0xFF;
         }
 
 //SALTO A LA MEMORIA QUE SE INDICA EN OpA
@@ -2085,13 +2107,12 @@ void RET(TMV * MV,TInstruc instruccion){
  //LEVANTO EL DATO
 
 TamPila = (MV->TDS[(MV->R[SS] >> 16) & 0XFFFF]) & 0XFFFF ; // TamSS
-
     if ((MV->R[SP] & 0XFFFF) == TamPila)
         generaerror(ERRSTUNF);
     else{
-        PosSP = MV->R[SP];
+        PosSP = direccionamiento_logtofis(*MV,MV->R[SP]);
         for (int i=0;i<4;i++){ //Recorro los 4 bytes ; arranco desde el más significativo (tope de la pila)
-            guardo += MV->MEM[PosSP];
+            guardo |= MV->MEM[PosSP];
             PosSP++;
             if (4 - i > 1)
                 guardo = guardo << 8;
