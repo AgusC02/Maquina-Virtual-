@@ -58,6 +58,7 @@ typedef struct TMV{
   char *archivovmi;
   char disassembler;
   char flagdebug;
+  char version;
 }TMV;
 
 typedef struct TInstruc{

@@ -19,7 +19,7 @@ void iniciasubrutina(TMV *MV){
 
     aux=MV->argc;
     for (i=3;i>=0;i--){
-        //aux=MV->argc;
+       
         MV->MEM[posicionfisicaSP--]=aux & 0xFF;
         aux=aux >> (8*i);
     }
@@ -144,7 +144,7 @@ void armaParamSegment(TMV *MV,int argc, char *argv[],int *paramsize){
     unsigned char aux_uchar;
 
     memindx=0;
-    //sizestr=0;
+    
     for (i=0;i<argc;i++){
         sizestr=0;
         sizestr+=(strlen(argv[i])+1);
@@ -495,6 +495,7 @@ void LeoArch(char nomarch[],TMV *MV){
 
   if(header.c1=='V' && header.c2 =='M' && header.c3=='X' && header.c4=='2' && header.c5=='5'){
     if (header.version==1){
+    MV->version=1;
     inicializoTDS(MV,header);
     inicializoRegistros(MV,header);
 
@@ -504,6 +505,7 @@ void LeoArch(char nomarch[],TMV *MV){
     }
     }
     else if (header.version==2){
+        MV->version=2;
         fread(&leo,sizeof(char),1,arch);
         header.tamDS=leo;
         header.tamDS=header.tamDS<<8;
@@ -746,6 +748,8 @@ int LeoEnMemoria(TMV MV,int Op){ // Guarda el valor de los 4 bytes de memoria en
     int TamModif,corro;
 
     offset=Op>>8;
+    offset<<=16;
+    offset>>=16;
     CodReg=(Op>>4)&0xF;
     modif = Op & 0X3;
     TamModif = (~modif)&0x3;
@@ -2119,12 +2123,14 @@ void LeoInstruccionesDissasembler(TMV MV,char VecFunciones[CANTFUNC][5],char Vec
     unsigned short int PosInicialCS,PosMemoria=0,PosFinal;
 
     // CONSTANTES
-    if (MV.R[KS] != -1){
-      InicioKS = (MV.TDS[((MV.R[KS] >> 16) & 0XFFFF)] >> 16) & 0XFFFF;
-      TamKS = MV.TDS[((MV.R[KS] >> 16) & 0XFFFF)] & 0XFFFF;
-      PosMemoria = InicioKS;
-      while (PosMemoria < TamKS)
-            EscribeCadenaDissasembler(MV,&PosMemoria);
+    if(MV.version==2){
+        if (MV.R[KS] != -1){
+            InicioKS = (MV.TDS[((MV.R[KS] >> 16) & 0XFFFF)] >> 16) & 0XFFFF;
+            TamKS = MV.TDS[((MV.R[KS] >> 16) & 0XFFFF)] & 0XFFFF;
+            PosMemoria = InicioKS;
+            while (PosMemoria < TamKS)
+                    EscribeCadenaDissasembler(MV,&PosMemoria);
+        }   
     }
     InicioCS = (MV.TDS[((MV.R[CS] >> 16) & 0XFFFF)] >> 16) & 0XFFFF;
     PosMemoria = InicioCS;
